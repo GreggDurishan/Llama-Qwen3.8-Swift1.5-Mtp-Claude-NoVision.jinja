@@ -16,6 +16,9 @@ tags:
 
 # Fixed jinja chat templates for Qwen 3.5 & 3.6 (v16)
 
+<details>
+<summary><b>Update History & Changelog (v11-v16)</b></summary>
+
 > **2026-05-14 Update (v16):** Four-part fix addressing community-reported regressions. (1) **Native XML tool format:** reverted from JSON back to the native `<function=name>` / `<parameter=x>` format the model was trained on, restoring full compatibility with vLLM's `qwen3_coder` parser and all inference engines that implement the Qwen tool protocol. (2) **`--reasoning off` respected in error paths:** when thinking is disabled (`enable_thinking=false` / `--reasoning off`), the error escalation directives are now injected as plain text without opening any `<think>` block, preventing degenerate prompts in no-reasoning sessions. (3) **Smarter false-positive detection:** short shell command results (starting with `$ `) and search results with timing footers (`Took X.Xs`) are now correctly excluded from error detection, preventing tool-retry loops when commands succeed but their output happens to contain the word `error`. (4) **`consecutive_failures` counter no longer resets on assistant messages**, allowing Tier 2 escalation to actually fire across multi-turn tool retry chains.
 >
 > **2026-05-13 Update (v15):** Three-part fix for agentic tool-loop failures. (1) **Two-tier error escalation:** replaced the brittle backwards-lookahead error detection with a fully forward-tracking `last_tool_failed` + `consecutive_failures` counter. On the first error the generation prompt is pre-seeded with a correction directive inside `<think>`; on the 2nd+ consecutive error the think block is bypassed and an out-of-band directive forces an immediate corrected action. (2) **Length-gated detection:** error signals are only read from short tool responses (< 500 chars), preventing false positives when reading code files containing `error`, `exception`, etc. in legitimate content. (3) **Static system prompt:** tool instructions are now fully unconditional, permanently eliminating the KV cache invalidation vector introduced in v14.
@@ -27,6 +30,9 @@ tags:
 > **2026-05-10 Update (v12):** Fixed agent stalls, parameter data-loss, and hallucination bugs! Restored dynamic tool instructions and the `<IMPORTANT>` formatting reminder block to stop grammar parser crashes.
 >
 > **2026-05-10 Update (v11):** Fixed agent looping and overthinking! Re-implemented `preserve_thinking` kwarg to properly strip reasoning blocks from history by default, and restored the reasoning bypass (`<think>\n\n</think>\n\n`).
+
+</details>
+
 
 These are drop-in Jinja templates that fix rendering errors, token waste, and missing features in the official Qwen chat templates.
 
