@@ -148,9 +148,9 @@ Reminder:
                 {%- set reasoning_content = reasoning_parts[0] %}
                 {%- set content = reasoning_parts[1:] | join(think_end_token) %}
                 {%- if '<think>' in reasoning_content %}
-                    {%- set r_prefix = reasoning_content.split('<think>')[0] %}
-                    {%- set reasoning_content = reasoning_content.split('<think>')[1:] | join('<think>') %}
-                    {%- set content = r_prefix ~ '\n' ~ content %}
+                    {%- set r_prefix = reasoning_content.split('<think>')[0] | trim %}
+                    {%- set reasoning_content = reasoning_content.split('<think>')[1:] | join('<think>') | trim %}
+                    {%- set content = (r_prefix ~ '\n' ~ content) | trim %}
                 {%- endif %}
             {%- elif '<think>' in content %}
                 {%- set prefix = content.split('<think>')[0] %}
@@ -205,11 +205,7 @@ Reminder:
                 {%- if tool_call.function is defined %}
                     {%- set tool_call = tool_call.function %}
                 {%- endif %}
-                {%- if loop.first and content %}
-                    {{- '\n<tool_call>\n' }}
-                {%- else %}
-                    {{- '\n<tool_call>\n' }}
-                {%- endif %}
+                {{- '\n<tool_call>\n' }}
                 {{- '<function=' ~ tool_call.name ~ '>\n' }}
                 {%- if tool_call.arguments is defined and tool_call.arguments is mapping %}
                     {%- if tool_call.arguments | length > 0 %}
@@ -236,14 +232,14 @@ Reminder:
         {%- if content | length < 500
             and '$ ' not in content
             and 'took ' not in content_lower
-            and ('error' in content_lower or 'fail' in content_lower or 'invalid' in content_lower or 'exceeds' in content_lower or 'retry' in content_lower or 'exception' in content_lower) %}
+            and ('"error":' in content_lower or 'error:' in content_lower or 'exception:' in content_lower or 'traceback' in content_lower or 'command not found' in content_lower or 'invalid syntax' in content_lower or 'failed to' in content_lower) %}
             {%- set ns_flags.last_tool_failed = true %}
             {%- set ns_flags.consecutive_failures = ns_flags.consecutive_failures + 1 %}
         {%- else %}
             {%- set ns_flags.last_tool_failed = false %}
             {%- set ns_flags.consecutive_failures = 0 %}
         {%- endif %}
-        {%- if loop.previtem and loop.previtem.role != "tool" %}
+        {%- if loop.index0 > 0 and messages[loop.index0 - 1].role != "tool" %}
             {{- '<|im_start|>user' }}
         {%- endif %}
         {{- '\n<tool_response>\n' }}
@@ -256,7 +252,7 @@ Reminder:
             {%- endif %}
         {%- endif %}
         {{- '\n</tool_response>' }}
-        {%- if not loop.last and loop.nextitem.role != "tool" %}
+        {%- if not loop.last and messages[loop.index0 + 1].role != "tool" %}
             {{- '<|im_end|>\n' }}
         {%- elif loop.last %}
             {{- '<|im_end|>\n' }}
@@ -268,9 +264,9 @@ Reminder:
 {%- if add_generation_prompt %}
     {{- '<|im_start|>assistant\n' }}
     {%- if ns_flags.enable_thinking is false %}
-        {{- '<think>\n\n</think>\n\n' }}
+        {{- '<think>\n</think>\n' }}
     {%- elif ns_flags.last_tool_failed and ns_flags.consecutive_failures >= 2 %}
-        {{- '<think>\n\n</think>\n\n' }}
+        {{- '<think>\n</think>\n' }}
     {%- else %}
         {{- '<think>\n' }}
     {%- endif %}
