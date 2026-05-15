@@ -77,7 +77,6 @@ If you choose to call a function ONLY reply in the following format with NO suff
 <think>
 Brief explanation of tool call
 </think>
-
 <tool_call>
 <function=example_function_name>
 <parameter=example_parameter_1>
@@ -95,7 +94,10 @@ multiple lines
 Reminder:
 - Function calls MUST follow the specified format: an inner <function=...></function> block must be nested within <tool_call></tool_call> XML tags
 - Required parameters MUST be specified
-- Use the <think></think> block to reason about your actions, plan function calls, and synthesize results before your final response
+- ALL explanation and reasoning MUST be placed strictly inside the <think></think> block.
+- IMMEDIATELY after closing </think>, you must output the <tool_call> block. Do NOT output any conversational text in between.
+- The <tool_call> and <function> tags MUST be at the very beginning of a new line, with NO spaces or indentation before them.
+- To call multiple functions, output a separate, completely closed <tool_call></tool_call> block for EACH function. Do NOT nest <tool_call> blocks.
 - If there is no function call available, answer the question like normal with your current knowledge and do not tell the user about function calls
 </IMPORTANT>
     {%- endset %}
@@ -164,6 +166,11 @@ Reminder:
         {%- endif %}
         {%- set reasoning_content = reasoning_content | trim %}
         {%- set content = content | trim %}
+        {%- if message.tool_calls and message.tool_calls is iterable and message.tool_calls is not mapping %}
+            {%- if '<tool_call>' in content %}
+                {%- set content = content.split('<tool_call>')[0] | trim %}
+            {%- endif %}
+        {%- endif %}
         {%- set show_think = false %}
         {%- if reasoning_content %}
             {%- if preserve_thinking is defined and preserve_thinking %}
@@ -173,9 +180,25 @@ Reminder:
             {%- endif %}
         {%- endif %}
         {%- if show_think %}
-            {{- '<|im_start|>' + message.role + '\n<think>\n' + reasoning_content + '\n</think>\n\n' + content }}
+            {%- if content %}
+                {{- '<|im_start|>' + message.role + '\n<think>\n' + reasoning_content + '\n</think>\n' + content }}
+            {%- else %}
+                {{- '<|im_start|>' + message.role + '\n<think>\n' + reasoning_content + '\n</think>' }}
+            {%- endif %}
         {%- else %}
-            {{- '<|im_start|>' + message.role + '\n' + content }}
+            {%- if message.role == 'assistant' and ns_flags.enable_thinking is not false %}
+                {%- if content %}
+                    {{- '<|im_start|>' + message.role + '\n<think>\n</think>\n' + content }}
+                {%- else %}
+                    {{- '<|im_start|>' + message.role + '\n<think>\n</think>' }}
+                {%- endif %}
+            {%- else %}
+                {%- if content %}
+                    {{- '<|im_start|>' + message.role + '\n' + content }}
+                {%- else %}
+                    {{- '<|im_start|>' + message.role }}
+                {%- endif %}
+            {%- endif %}
         {%- endif %}
         {%- if message.tool_calls and message.tool_calls is iterable and message.tool_calls is not mapping %}
             {%- for tool_call in message.tool_calls %}
@@ -183,7 +206,7 @@ Reminder:
                     {%- set tool_call = tool_call.function %}
                 {%- endif %}
                 {%- if loop.first and content %}
-                    {{- '\n\n<tool_call>\n' }}
+                    {{- '\n<tool_call>\n' }}
                 {%- else %}
                     {{- '\n<tool_call>\n' }}
                 {%- endif %}
@@ -225,6 +248,13 @@ Reminder:
         {%- endif %}
         {{- '\n<tool_response>\n' }}
         {{- content }}
+        {%- if ns_flags.last_tool_failed %}
+            {%- if ns_flags.consecutive_failures >= 2 %}
+                {{- '\n\n⚠️ SYSTEM WARNING: ' ~ ns_flags.consecutive_failures ~ ' consecutive tool errors detected. Your previous approach is incorrect. You MUST use a fundamentally different approach or corrected arguments.' }}
+            {%- else %}
+                {{- '\n\n⚠️ SYSTEM WARNING: The previous tool call returned an error. Diagnose the failure and retry with completely corrected arguments.' }}
+            {%- endif %}
+        {%- endif %}
         {{- '\n</tool_response>' }}
         {%- if not loop.last and loop.nextitem.role != "tool" %}
             {{- '<|im_end|>\n' }}
@@ -237,20 +267,9 @@ Reminder:
 {%- endfor %}
 {%- if add_generation_prompt %}
     {{- '<|im_start|>assistant\n' }}
-    {%- if ns_flags.last_tool_failed %}
-        {%- if ns_flags.consecutive_failures >= 2 %}
-            {%- if ns_flags.enable_thinking is not false %}
-                {{- '<think>\n\n</think>\n\n' }}
-            {%- endif %}
-            {{- '⚠️ ' ~ ns_flags.consecutive_failures ~ ' consecutive tool errors. My previous approach is wrong. I will now call the tool with a fundamentally different, corrected approach:\n\n' }}
-        {%- else %}
-            {%- if ns_flags.enable_thinking is not false %}
-                {{- '<think>\nThe previous tool call returned an error. I must diagnose the failure and retry with completely corrected arguments:\n' }}
-            {%- else %}
-                {{- 'The previous tool call returned an error. I must retry with completely corrected arguments:\n\n' }}
-            {%- endif %}
-        {%- endif %}
-    {%- elif ns_flags.enable_thinking is false %}
+    {%- if ns_flags.enable_thinking is false %}
+        {{- '<think>\n\n</think>\n\n' }}
+    {%- elif ns_flags.last_tool_failed and ns_flags.consecutive_failures >= 2 %}
         {{- '<think>\n\n</think>\n\n' }}
     {%- else %}
         {{- '<think>\n' }}

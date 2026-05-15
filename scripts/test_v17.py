@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 """
-Test suite for Qwen v15 chat templates.
+Test suite for Qwen v17 chat templates.
 Tests logical correctness using Python Jinja2 (minijinja compatibility verified separately).
 
 Usage:
-    python3 scripts/test_v15.py
-    python3 scripts/test_v15.py qwen3.6   # test one variant
+    python3 scripts/test_v17.py
+    python3 scripts/test_v17.py qwen3.6   # test one variant
 """
 
 import sys
@@ -16,11 +16,11 @@ from jinja2 import Environment
 # ── Setup ──────────────────────────────────────────────────────────────────────
 
 ROOT = Path(__file__).parent.parent
-VARIANTS = ["qwen3.5", "qwen3.6"]
-VERSION = "v16"
+VARIANTS = ["root"]
+VERSION = "v17"
 
-def load_template(variant: str) -> str:
-    path = ROOT / variant / f"chat_template-{VERSION}.jinja"
+def load_template() -> str:
+    path = ROOT / "chat_template.jinja"
     return path.read_text(encoding="utf-8")
 
 def render(template_src: str, messages: list, tools=None,
@@ -373,14 +373,14 @@ TESTS = [
 ]
 results: list[bool] = []
 
-def run_variant(variant: str):
+def run_tests():
     print(f"\n{'═'*60}")
-    print(f"  {variant}")
+    print(f"  Testing v17 Chat Template")
     print(f"{'═'*60}")
     try:
-        tmpl = load_template(variant)
+        tmpl = load_template()
     except FileNotFoundError:
-        print(f"  Template not found: {variant}/chat_template-v15.jinja")
+        print(f"  Template not found: chat_template.jinja")
         return
     for fn in TESTS:
         label = fn.__name__.replace("test_", "").replace("_", " ").title()
@@ -388,12 +388,8 @@ def run_variant(variant: str):
         fn(tmpl)
 
 if __name__ == "__main__":
-    target = sys.argv[1] if len(sys.argv) > 1 else None
-    variants = [target] if target else VARIANTS
-
     results.clear()
-    for v in variants:
-        run_variant(v)
+    run_tests()
 
     total = len(results)
     passed = sum(results)
