@@ -17,7 +17,7 @@ tags:
 # Fixed jinja chat templates for Qwen 3.5 & 3.6 (v18)
 
 <details open>
-<summary><b>Update History & Changelog (v17)</b></summary>
+<summary><b>Update History & Changelog (v18)</b></summary>
 
 > **2026-05-16 Update (v18): Stability & Precision Patch.** (1) **Bulletproof False-Positive Detection:** Shifted agentic error detection from broad substring matching to strict structural formats (e.g., `"error":`, `Exception:`, `Traceback`), completely curing false-positive retry loops when successful JSON returns simply contain the word "error" or "fail". (2) **Legacy Engine Compatibility:** Replaced `loop.previtem` with explicit array indexing, fixing AST crashes on older `llama.cpp` and `minijinja` builds that do not track loop state items. (3) **True Whitespace Normalization:** Fixed a bug where reasoning bypasses and hallucinated tag recovery stacked hidden multi-newlines (`\n\n\n`), strictly fulfilling the 100% KV Cache hit rate claim for all edge cases. (4) **Code Cleanup:** Removed dead conditional branches during XML tool parsing.
 
@@ -25,7 +25,7 @@ tags:
 </details>
 
 <details>
-<summary><b>Update History & Changelog (v11-v16)</b></summary>
+<summary><b>Update History & Changelog (v11-v17)</b></summary>
 
 > **2026-05-15 Update (v17):** Major architecture overhaul resolving edge cases in agentic tooling and KV Cache. (1) **Unified Template:** Consolidated Qwen 3.5 and Qwen 3.6 into a single `chat_template.jinja` file that handles all variants seamlessly. (2) **Fixed "Mutually Exclusive" Stopping Bug:** Changed the history-pruning logic from wiping the entire turn to safely array-slicing out just the raw tool tags (`content.split('<tool_call>')[0]`). This preserves the conversational text in the history, which cures the bug where the model would artificially abort its turn (output `<|im_end|>`) when it wanted to talk and use a tool simultaneously. (3) **100% KV Cache Hit Rate Restoration:** Fully normalized internal whitespace logic (`\n\n` -> `\n`) around think blocks and tool calls to exactly match the model's native autoregressive generation spacing. This perfectly synchronizes the template's rendered history with the cached generated tokens, completely eliminating the severe cache invalidation and full-prompt re-processing issues present in v16.
 >

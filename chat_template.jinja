@@ -92,13 +92,13 @@ multiple lines
 
 <IMPORTANT>
 Reminder:
-- Function calls MUST follow the specified format: an inner <function=...></function> block must be nested within <tool_call></tool_call> XML tags
-- Required parameters MUST be specified
+- You can use the <think></think> block to plan your next tool call OR to synthesize data and formulate your final response to the user.
 - ALL explanation and reasoning MUST be placed strictly inside the <think></think> block.
-- IMMEDIATELY after closing </think>, you must output the <tool_call> block. Do NOT output any conversational text in between.
+- Function calls MUST follow the specified format: an inner <function=...></function> block must be nested within <tool_call></tool_call> XML tags.
+- If you choose to call a tool, you MUST output the <tool_call> block IMMEDIATELY after closing </think>. Do NOT output any conversational text before the tool call.
 - The <tool_call> and <function> tags MUST be at the very beginning of a new line, with NO spaces or indentation before them.
 - To call multiple functions, output a separate, completely closed <tool_call></tool_call> block for EACH function. Do NOT nest <tool_call> blocks.
-- If there is no function call available, answer the question like normal with your current knowledge and do not tell the user about function calls
+- If you have gathered all necessary data and do not need to call a tool, answer the question like normal and provide your final response to the user IMMEDIATELY after closing </think>.
 </IMPORTANT>
     {%- endset %}
     {{- '\n\n' ~ tool_instructions | trim }}
@@ -171,33 +171,25 @@ Reminder:
                 {%- set content = content.split('<tool_call>')[0] | trim %}
             {%- endif %}
         {%- endif %}
-        {%- set show_think = false %}
-        {%- if reasoning_content %}
-            {%- if preserve_thinking is defined and preserve_thinking %}
-                {%- set show_think = true %}
-            {%- elif loop.last %}
-                {%- set show_think = true %}
-            {%- endif %}
+        {%- set show_think = true %}
+        {%- if preserve_thinking is defined and preserve_thinking == false %}
+            {%- set show_think = false %}
         {%- endif %}
-        {%- if show_think %}
+        {%- if not reasoning_content %}
+            {%- set show_think = false %}
+        {%- endif %}
+        
+        {%- if show_think and ns_flags.enable_thinking is not false %}
             {%- if content %}
                 {{- '<|im_start|>' + message.role + '\n<think>\n' + reasoning_content + '\n</think>\n' + content }}
             {%- else %}
                 {{- '<|im_start|>' + message.role + '\n<think>\n' + reasoning_content + '\n</think>' }}
             {%- endif %}
         {%- else %}
-            {%- if message.role == 'assistant' and ns_flags.enable_thinking is not false %}
-                {%- if content %}
-                    {{- '<|im_start|>' + message.role + '\n<think>\n</think>\n' + content }}
-                {%- else %}
-                    {{- '<|im_start|>' + message.role + '\n<think>\n</think>' }}
-                {%- endif %}
+            {%- if content %}
+                {{- '<|im_start|>' + message.role + '\n' + content }}
             {%- else %}
-                {%- if content %}
-                    {{- '<|im_start|>' + message.role + '\n' + content }}
-                {%- else %}
-                    {{- '<|im_start|>' + message.role }}
-                {%- endif %}
+                {{- '<|im_start|>' + message.role }}
             {%- endif %}
         {%- endif %}
         {%- if message.tool_calls and message.tool_calls is iterable and message.tool_calls is not mapping %}
