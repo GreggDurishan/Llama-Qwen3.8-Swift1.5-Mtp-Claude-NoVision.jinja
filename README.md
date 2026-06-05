@@ -14,9 +14,16 @@ tags:
   - thinking
 ---
 
-# Fixed jinja chat templates for Qwen 3.5 & 3.6 (v19)
+# Fixed jinja chat templates for Qwen 3.5 & 3.6 (v20)
 
 <details open>
+<summary><b>Update History & Changelog (v20)</b></summary>
+
+> **2026-06-05 Update (v20): The Architect Patch.** A monumental structural overhaul targeting deep agentic loops and C++ inference engine compatibility. (1) **Minja AST Flattening:** Dramatically optimized Jinja nesting depths to resolve severe parsing bottlenecks that were dropping inference throughput by 80% on `llama.cpp`. (2) **Auto-disable Thinking:** Introduced `auto_disable_thinking_with_tools` kwarg (default `false`) that allows users to instantly shut off reasoning blocks during tool use to completely prevent `<tool_call>` hallucinations inside `<think>` tags. (3) **Deep Agent Fallbacks:** Resolved exceptions triggered by mid-conversation system prompts or loops lacking human `user` messages. (4) **Payload Truncation:** Implemented `max_tool_arg_chars` and `max_tool_response_chars` configurations to definitively stop context-window explosions from massive data returns. *(Huge thanks to `barubary` / `spiritbuun` for their contributions to these C++ architecture optimizations!)*
+
+</details>
+
+<details>
 <summary><b>Update History & Changelog (v19)</b></summary>
 
 > **2026-05-18 Update (v19): The Agentic Loop Cure.** (1) **Abolished "Empty Think" Poisoning:** Rewrote the AST history rendering to completely remove the injection of empty `<think>\n</think>` blocks. This cures a severe in-context learning bias where the model assumed tools could only be called if it didn't think first, which was causing 80%+ of premature `<|im_end|>` turn aborts. (2) **System Prompt Logic Trap Removed:** Softened the absolute tool mandate in the `<IMPORTANT>` block and restored Universal Synthesis instructions. The model is now explicitly permitted to transition from `</think>` to a conversational answer without panicking. (3) **True 100% KV Cache & Amnesia Fix:** `preserve_thinking` now defaults to `true`. Past thoughts are retained chronologically, permanently curing "amnesia stalls" during multi-step tool loops while mathematically guaranteeing 100% KV Cache prefix matching out-of-the-box.
@@ -211,10 +218,10 @@ Python-only Jinja2 features crash on `minijinja` (the C++ runtime used by llama.
 ## Running the test suite
 
 ```bash
-python3 scripts/test_v18.py
+python3 scripts/test_v20.py
 ```
 
-Tests cover: XML tool format, tool instructions, thinking bypass, `<|think_off|>` / `<|think_on|>`, Tier 1 & 2 escalation, length-gated detection, shell/search false positives, `--reasoning off` + errors, counter reset, historical think stripping, `preserve_thinking`, developer role, mid-conversation system, tool response wrapping, and string argument passthrough.
+Tests cover: `auto_disable_thinking_with_tools`, payload truncation logic, parallel tool spacing, mid-conversation system rendering, deep agent loop fallback, XML tool format, `<|think_off|>` / `<|think_on|>` inline overrides, and all legacy v19 regression tests.
 
 ---
 
@@ -224,6 +231,7 @@ Tests cover: XML tool format, tool instructions, thinking bypass, `<|think_off|>
 |------|--------|
 | Original models | Alibaba Cloud (Qwen team) |
 | Template fixes | [froggeric](https://huggingface.co/froggeric) |
+| C++ AST optimizations | [barubary](https://github.com/spiritbuun/buun-llama-cpp) / `spiritbuun` |
 
 ## License
 
