@@ -71,10 +71,10 @@
     {%- set _sc = render_content(_sys_msg.content, false, true) | trim %}
     {%- if '<|think_off|>' in _sc %}
         {%- set ns_state.thinking = false %}
-        {%- set _sc = _sc | replace('<|think_off|>', '') | trim %}
+        {%- set _sc = _sc.split('<|think_off|>') | join('') | trim %}
     {%- elif '<|think_on|>' in _sc %}
         {%- set ns_state.thinking = true %}
-        {%- set _sc = _sc | replace('<|think_on|>', '') | trim %}
+        {%- set _sc = _sc.split('<|think_on|>') | join('') | trim %}
     {%- endif %}
 {%- endif %}
 {%- if _has_tools %}
@@ -150,10 +150,10 @@ Reminder:
     {%- set content = render_content(message.content, true, is_system) | trim %}
     {%- if '<|think_off|>' in content %}
         {%- set ns_state.thinking = false %}
-        {%- set content = content | replace('<|think_off|>', '') | trim %}
+        {%- set content = content.split('<|think_off|>') | join('') | trim %}
     {%- elif '<|think_on|>' in content %}
         {%- set ns_state.thinking = true %}
-        {%- set content = content | replace('<|think_on|>', '') | trim %}
+        {%- set content = content.split('<|think_on|>') | join('') | trim %}
     {%- endif %}
     {%- if is_system %}
         {{- '<|im_start|>system\n' + content + '<|im_end|>\n' }}
