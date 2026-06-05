@@ -19,7 +19,7 @@ tags:
 <details open>
 <summary><b>Update History & Changelog (v20)</b></summary>
 
-> **2026-06-05 Update (v20): The Architect Patch.** A monumental structural overhaul targeting deep agentic loops and C++ inference engine compatibility. (1) **Minja AST Flattening:** Dramatically optimized Jinja nesting depths to resolve severe parsing bottlenecks that were dropping inference throughput by 80% on `llama.cpp`. (2) **Auto-disable Thinking:** Introduced `auto_disable_thinking_with_tools` kwarg (default `false`) that allows users to instantly shut off reasoning blocks during tool use to completely prevent `<tool_call>` hallucinations inside `<think>` tags. (3) **Deep Agent Fallbacks:** Resolved exceptions triggered by mid-conversation system prompts or loops lacking human `user` messages. (4) **Payload Truncation:** Implemented `max_tool_arg_chars` and `max_tool_response_chars` configurations to definitively stop context-window explosions from massive data returns. *(Huge thanks to `barubary` / `spiritbuun` for their contributions to these C++ architecture optimizations!)*
+> **2026-06-05 Update (v20): The Architect Patch.** A monumental structural overhaul targeting deep agentic loops and C++ inference engine compatibility. (1) **Minja AST Flattening:** Dramatically optimized Jinja nesting depths to resolve severe parsing bottlenecks that were dropping inference throughput by 80% on `llama.cpp`. (2) **Minja Replace Bug Fix (Hotfix):** Bypassed a severe C++ parsing bug in `llama.cpp` where using the `replace` filter at index 0 of a user prompt silently dropped the entire text payload. Inline thinking toggles now use `split` and `join` for robust stripping. (3) **Auto-disable Thinking:** Introduced `auto_disable_thinking_with_tools` kwarg (default `false`) that allows users to instantly shut off reasoning blocks during tool use. (4) **Deep Agent Fallbacks:** Resolved exceptions triggered by mid-conversation system prompts or loops lacking human `user` messages. (5) **Payload Truncation:** Implemented `max_tool_arg_chars` and `max_tool_response_chars` configurations to definitively stop context-window explosions from massive data returns. *(Huge thanks to `barubary` / `spiritbuun` for their contributions to these C++ architecture optimizations!)*
 
 </details>
 
@@ -181,10 +181,11 @@ When a tool call fails validation repeatedly, the model can enter a degenerate r
 ### 5. Smart False-Positive Detection (v18)
 Instead of broad substring matching that triggers false retry-loops on successful database returns containing words like "error", v18 utilizes strict structural guards looking for `Exception:`, `"error":`, `Traceback`, and `command not found`, combined with length gates and shell-echo exclusions (`$ `).
 
-### 6. minijinja Compatibility Constraints (v18)
-Python-only Jinja2 features crash on `minijinja` (the C++ runtime used by llama.cpp, LM Studio, and MLX). All instances have been refactored for universal support:
+### 6. minijinja Compatibility Constraints (v18/v20)
+Python-only Jinja2 features crash or misbehave on `minijinja`/`minja` (the C++ runtime used by llama.cpp, LM Studio, and MLX). All instances have been refactored for universal support:
+- `content | replace('<|think_on|>', '')` -> `content.split('<|think_on|>') | join('')` (Fixes a severe bug where `minja` silently drops the entire text payload if the replaced string is found at index 0).
 - `\| items` -> `for key in mapping`
-- `loop.previtem` -> `messages[loop.index0 - 1]` (v18)
+- `loop.previtem` -> `messages[loop.index0 - 1]`
 - `map('string')` -> `join('|')`
 - `\| first` -> `'$ ' in content`
 
