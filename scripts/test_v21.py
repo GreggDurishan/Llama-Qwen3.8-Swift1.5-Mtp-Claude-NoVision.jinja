@@ -163,6 +163,17 @@ execute_test(
     expected_in=["⚠️ SYSTEM WARNING: 2 consecutive tool errors", "<think>\n\n</think>\n\n"]
 )
 
+run_test(
+    "tool_call_format='json' (override)",
+    messages=[{"role": "user", "content": "Call tool"}, {"role": "assistant", "content": "", "tool_calls": [{"function": {"name": "test", "arguments": {"par": "1234567890"}}}]}],
+    tools=[{"type": "function", "function": {"name": "test", "description": "test tool"}}],
+    kwargs={'tool_call_format': 'json'},
+    expected_in=[
+        'Function calls MUST follow the specified format: a single JSON object with "name" and "arguments"',
+        '{"name": "test", "arguments": {"par": "1234567890"}}'
+    ]
+)
+
 print(f"\n=============================")
 print(f"Test Summary: {tests_passed} / {tests_total} passed.")
 if tests_passed == tests_total:
