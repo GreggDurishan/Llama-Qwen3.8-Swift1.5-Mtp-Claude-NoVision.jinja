@@ -92,25 +92,16 @@ If you choose to call a function ONLY reply in the following format with NO suff
 Brief explanation of tool call
 </think>
 <tool_call>
-<function=example_function_name>
-<parameter=example_parameter_1>
-value_1
-</parameter>
-<parameter=example_parameter_2>
-This is the value for the second parameter
-that can span
-multiple lines
-</parameter>
-</function>
+{"name": "example_function_name", "arguments": {"example_parameter_1": "value_1", "example_parameter_2": "This is the value for the second parameter"}}
 </tool_call>
 
 <IMPORTANT>
 Reminder:
 - You can use the <think></think> block to plan your next tool call OR to synthesize data and formulate your final response to the user.
 - ALL explanation and reasoning MUST be placed strictly inside the <think></think> block.
-- Function calls MUST follow the specified format: an inner <function=...></function> block must be nested within <tool_call></tool_call> XML tags.
+- Function calls MUST follow the specified format: a single JSON object with "name" and "arguments" keys inside <tool_call></tool_call> XML tags.
 - If you choose to call a tool, you MUST output the <tool_call> block IMMEDIATELY after closing </think>. Do NOT output any conversational text before the tool call.
-- The <tool_call> and <function> tags MUST be at the very beginning of a new line, with NO spaces or indentation before them.
+- The <tool_call> tag MUST be at the very beginning of a new line, with NO spaces or indentation before it.
 - To call multiple functions, output a separate, completely closed <tool_call></tool_call> block for EACH function. Do NOT nest <tool_call> blocks.
 - If you have gathered all necessary data and do not need to call a tool, answer the question like normal and provide your final response to the user IMMEDIATELY after closing </think>.
 </IMPORTANT>
@@ -205,39 +196,23 @@ Reminder:
                 {%- else %}
                     {%- set tc = tool_call %}
                 {%- endif %}
-                {%- if loop.first %}
-                    {%- if content | trim %}
-                        {{- '\n\n<tool_call>\n<function=' + tc.name + '>\n' }}
-                    {%- else %}
-                        {{- '<tool_call>\n<function=' + tc.name + '>\n' }}
-                    {%- endif %}
-                {%- else %}
-                    {{- '\n\n<tool_call>\n<function=' + tc.name + '>\n' }}
+                {%- if not loop.first or content | trim %}
+                    {{- '\n\n' }}
                 {%- endif %}
+                {%- set _args = '{}' %}
                 {%- if tc.arguments is defined and tc.arguments is not none %}
                     {%- if tc.arguments is mapping %}
-                        {%- for args_name, args_value in tc.arguments.items() %}
-                            {{- '<parameter=' + args_name + '>\n' }}
-                            {%- if args_value is mapping or (args_value is sequence and args_value is not string) %}
-                                {%- set _av = args_value | tojson %}
-                            {%- else %}
-                                {%- set _av = args_value | string %}
-                            {%- endif %}
-                            {%- if max_tool_arg_chars > 0 and _av | length > max_tool_arg_chars %}
-                                {{- _av[:max_tool_arg_chars] + '\n[TRUNCATED — original length ' ~ (_av | length | string) ~ ' chars]' }}
-                            {%- else %}
-                                {{- _av }}
-                            {%- endif %}
-                            {{- '\n</parameter>\n' }}
-                        {%- endfor %}
+                        {%- set _args = tc.arguments | tojson %}
                     {%- elif tc.arguments is string and tc.arguments %}
-                        {{- tc.arguments }}
+                        {%- set _args = tc.arguments %}
                     {%- endif %}
                 {%- endif %}
+                {%- if max_tool_arg_chars > 0 and _args | length > max_tool_arg_chars %}
+                    {%- set _args = _args[:max_tool_arg_chars] + '\n[TRUNCATED — original length ' ~ (_args | length | string) ~ ' chars]' %}
+                {%- endif %}
+                {{- '<tool_call>\n{"name": ' + (tc.name | tojson) + ', "arguments": ' + _args + '}\n</tool_call>' }}
                 {%- if loop.last %}
-                    {{- '</function>\n</tool_call>\n' }}
-                {%- else %}
-                    {{- '</function>\n</tool_call>' }}
+                    {{- '\n' }}
                 {%- endif %}
             {%- endfor %}
         {%- endif %}
