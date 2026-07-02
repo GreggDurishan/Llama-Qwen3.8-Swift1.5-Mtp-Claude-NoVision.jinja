@@ -170,17 +170,21 @@ Reminder:
             {%- endif %}
         {%- else %}
             {%- set _think_end = '' %}
-            {%- if '</think>' in content %}
+            {%- if content.startswith('</think>') %}
                 {%- set _think_end = '</think>' %}
-            {%- elif '</thinking>' in content %}
+            {%- elif content.startswith('</thinking>') %}
                 {%- set _think_end = '</thinking>' %}
-            {%- elif '</ think>' in content %}
-                {%- set _think_end = '</ think>' %}
-            {%- elif '</think >' in content %}
-                {%- set _think_end = '</think >' %}
+            {%- elif '\n</think>' in content %}
+                {%- set _think_end = '\n</think>' %}
+            {%- elif '\n</thinking>' in content %}
+                {%- set _think_end = '\n</thinking>' %}
+            {%- elif '\n</ think>' in content %}
+                {%- set _think_end = '\n</ think>' %}
+            {%- elif '\n</think >' in content %}
+                {%- set _think_end = '\n</think >' %}
             {%- endif %}
             {%- if _think_end %}
-                {%- if _think_end == '</thinking>' %}
+                {%- if 'thinking' in _think_end %}
                     {%- set _think_start = '<thinking>' %}
                 {%- else %}
                     {%- set _think_start = '<think>' %}
