@@ -93,7 +93,7 @@ execute_test(
     messages=[{"role": "user", "content": "Hello!"}],
     tools=[{"name": "test_tool"}],
     kwargs={"auto_disable_thinking_with_tools": True},
-    expected_in=["<think>\n</think>\n"], # Should be stripped
+    expected_in=["<think>\n\n</think>\n\n"], # Should be stripped
 )
 
 execute_test(
@@ -120,7 +120,7 @@ execute_test(
     "max_tool_arg_chars truncation",
     messages=[{"role": "user", "content": "Call tool"}, {"role": "assistant", "content": "", "tool_calls": [{"function": {"name": "test", "arguments": {"param": "1234567890"}}}]}],
     kwargs={"max_tool_arg_chars": 5},
-    expected_in=["12345\n[TRUNCATED"]
+    expected_in=["<parameter=param>\n12345\n[TRUNCATED"]
 )
 
 execute_test(
@@ -141,7 +141,7 @@ execute_test(
 execute_test(
     "parallel tools delimiter",
     messages=[{"role": "user", "content": "x"}, {"role": "assistant", "content": "", "tool_calls": [{"name": "t1"}, {"name": "t2"}]}],
-    expected_in=["</tool_call>\n\n<tool_call>"]
+    expected_in=["</function>\n</tool_call>\n\n<tool_call>\n<function=t2>"]
 )
 
 # 6. Deep Agent Fallback
@@ -160,7 +160,7 @@ execute_test(
         {"role": "assistant", "content": "calling"},
         {"role": "tool", "content": "error: failed again"}
     ],
-    expected_in=["⚠️ SYSTEM WARNING: 2 consecutive tool errors", "<think>\n</think>\n"]
+    expected_in=["⚠️ SYSTEM WARNING: 2 consecutive tool errors", "<think>\n\n</think>\n\n"]
 )
 
 print(f"\n=============================")
