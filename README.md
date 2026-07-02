@@ -14,9 +14,16 @@ tags:
   - thinking
 ---
 
-# Fixed jinja chat templates for Qwen 3.5 & 3.6 (v20)
+# Fixed jinja chat templates for Qwen 3.5 & 3.6 (v21)
 
 <details open>
+<summary><b>Update History & Changelog (v21)</b></summary>
+
+> **2026-07-02 Update (v21): Reliability & Tooling Overhaul.** Addressed several critical bugs and compatibility issues, particularly around tool calling and prefix cache efficiency. (1) **Tool Call XML -> Hermes JSON:** Switched tool-call output to the native JSON format to restore compatibility with `llama.cpp` and `ik_llama`. (2) **Prefix Cache Fixes:** Restored the `preserve_thinking` default to `true` and removed extraneous newlines that broke caching. (3) **Prompt Injection Guard:** `<|think_off|>` tags in untrusted tool responses are now correctly ignored. (4) **Quoted Tag Bug Fix:** The template no longer corrupts history when the assistant quotes `</think>`. (5) **Anthropic `message.thinking`:** Added support for Anthropic-style reasoning content. (6) **False-Positive Tool Errors:** Reduced error detection scope to the first 80 characters of a response to prevent false positives. *(Huge thanks to `Moore2877` and `choongng` for their excellent contributions!)*
+
+</details>
+
+<details>
 <summary><b>Update History & Changelog (v20)</b></summary>
 
 > **2026-06-05 Update (v20): The Architect Patch.** A monumental structural overhaul targeting deep agentic loops and C++ inference engine compatibility. (1) **Minja AST Flattening:** Dramatically optimized Jinja nesting depths to resolve severe parsing bottlenecks that were dropping inference throughput by 80% on `llama.cpp`. (2) **Minja Replace Bug Fix (Hotfix):** Bypassed a severe C++ parsing bug in `llama.cpp` where using the `replace` filter at index 0 of a user prompt silently dropped the entire text payload. Inline thinking toggles now use `split` and `join` for robust stripping. (3) **Auto-disable Thinking:** Introduced `auto_disable_thinking_with_tools` kwarg (default `false`) that allows users to instantly shut off reasoning blocks during tool use. (4) **Deep Agent Fallbacks:** Resolved exceptions triggered by mid-conversation system prompts or loops lacking human `user` messages. (5) **Payload Truncation:** Implemented `max_tool_arg_chars` and `max_tool_response_chars` configurations to definitively stop context-window explosions from massive data returns. *(Huge thanks to `barubary` / `spiritbuun` for their contributions to these C++ architecture optimizations!)*
@@ -181,7 +188,7 @@ When a tool call fails validation repeatedly, the model can enter a degenerate r
 ### 5. Smart False-Positive Detection (v18)
 Instead of broad substring matching that triggers false retry-loops on successful database returns containing words like "error", v18 utilizes strict structural guards looking for `Exception:`, `"error":`, `Traceback`, and `command not found`, combined with length gates and shell-echo exclusions (`$ `).
 
-### 6. minijinja Compatibility Constraints (v18/v20)
+### 6. minijinja Compatibility Constraints (v20/v21)
 Python-only Jinja2 features crash or misbehave on `minijinja`/`minja` (the C++ runtime used by llama.cpp, LM Studio, and MLX). All instances have been refactored for universal support:
 - `content | replace('<|think_on|>', '')` -> `content.split('<|think_on|>') | join('')` (Fixes a severe bug where `minja` silently drops the entire text payload if the replaced string is found at index 0).
 - `\| items` -> `for key in mapping`
@@ -219,7 +226,7 @@ Python-only Jinja2 features crash or misbehave on `minijinja`/`minja` (the C++ r
 ## Running the test suite
 
 ```bash
-python3 scripts/test_v20.py
+python3 scripts/test_v21.py
 ```
 
 Tests cover: `auto_disable_thinking_with_tools`, payload truncation logic, parallel tool spacing, mid-conversation system rendering, deep agent loop fallback, XML tool format, `<|think_off|>` / `<|think_on|>` inline overrides, and all legacy v19 regression tests.
