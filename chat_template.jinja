@@ -244,7 +244,8 @@ Reminder:
         {{- '<|im_end|>\n' }}
     {%- elif message.role == 'tool' %}
         {%- set _content_lower = content | lower %}
-        {%- if content | length < 500 and '$ ' not in content and 'took ' not in _content_lower and ('"error":' in _content_lower or 'error:' in _content_lower or 'exception:' in _content_lower or 'traceback' in _content_lower or 'command not found' in _content_lower or 'invalid syntax' in _content_lower or 'failed to' in _content_lower) %}
+        {%- set _content_head = _content_lower[:80] %}
+        {%- if content | length < 500 and '$ ' not in content and 'took ' not in _content_lower and ('"error":' in _content_head or 'error:' in _content_head or 'err!' in _content_head or 'fatal:' in _content_head or 'exception:' in _content_head or 'traceback' in _content_head or 'command not found' in _content_head or 'invalid syntax' in _content_head or 'failed to' in _content_head) %}
             {%- set ns2.consecutive_failures = ns2.consecutive_failures + 1 %}
         {%- else %}
             {%- set ns2.consecutive_failures = 0 %}
