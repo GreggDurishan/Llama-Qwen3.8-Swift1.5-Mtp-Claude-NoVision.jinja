@@ -234,11 +234,7 @@ Reminder:
                         {{- tc.arguments }}
                     {%- endif %}
                 {%- endif %}
-                {%- if loop.last %}
-                    {{- '</function>\n</tool_call>\n' }}
-                {%- else %}
-                    {{- '</function>\n</tool_call>' }}
-                {%- endif %}
+                {{- '</function>\n</tool_call>' }}
             {%- endfor %}
         {%- endif %}
         {{- '<|im_end|>\n' }}
