@@ -109,10 +109,10 @@ Reminder:
 - You can use the <think></think> block to plan your next tool call OR to synthesize data and formulate your final response to the user.
 - ALL explanation and reasoning MUST be placed strictly inside the <think></think> block.
 - Function calls MUST follow the specified format: an inner <function=...></function> block must be nested within <tool_call></tool_call> XML tags.
-- If you choose to call a tool, you MUST output the <tool_call> block IMMEDIATELY after closing </think>. Do NOT output any conversational text before the tool call.
+- If you choose to call a tool, you MUST output the <tool_call> block IMMEDIATELY after thinking, with NO conversational text before it.
 - The <tool_call> and <function> tags MUST be at the very beginning of a new line, with NO spaces or indentation before them.
 - To call multiple functions, output a separate, completely closed <tool_call></tool_call> block for EACH function. Do NOT nest <tool_call> blocks.
-- If you have gathered all necessary data and do not need to call a tool, answer the question like normal and provide your final response to the user IMMEDIATELY after closing </think>.
+- If you have all necessary data, provide your final answer directly to the user without any tool call.
 </IMPORTANT>
     {%- endset %}
     {{- '\n\n' ~ tool_instructions | trim }}
