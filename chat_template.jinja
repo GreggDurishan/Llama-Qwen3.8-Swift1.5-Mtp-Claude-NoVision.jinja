@@ -263,9 +263,9 @@ Reminder:
 {%- if add_generation_prompt %}
     {{- '<|im_start|>assistant\n' }}
     {%- if not ns_state.thinking %}
-        {{- '<think>\n</think>\n' }}
+        {{- '<think>\n\n</think>\n\n' }}
     {%- elif ns2.consecutive_failures >= 2 %}
-        {{- '<think>\n</think>\n' }}
+        {{- '<think>\n\n</think>\n\n' }}
     {%- else %}
         {{- '<think>\n' }}
     {%- endif %}
