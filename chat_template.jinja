@@ -168,6 +168,12 @@ Reminder:
             {%- else %}
                 {%- set reasoning_content = message.reasoning_content | string %}
             {%- endif %}
+        {%- elif message.thinking is defined and message.thinking is not none %}
+            {%- if message.thinking is string %}
+                {%- set reasoning_content = message.thinking %}
+            {%- else %}
+                {%- set reasoning_content = message.thinking | string %}
+            {%- endif %}
         {%- else %}
             {%- set _think_end = '' %}
             {%- if '</think>' in content %}
