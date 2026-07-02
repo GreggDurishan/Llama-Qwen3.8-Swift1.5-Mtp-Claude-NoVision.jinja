@@ -162,6 +162,22 @@ However, if you are running constrained hardware and need to save context tokens
 
 ---
 
+## Tool Call Format Override (JSON vs XML)
+
+Qwen is natively trained to output tool calls in XML (`<function=name>`). By default, this template outputs perfectly formatted XML to maximize the model's intelligence and preserve its training distribution. 
+
+However, some C++ inference engine setups (like `llama-server`'s internal tool interception) may strictly require Hermes-style JSON formatting to parse tool calls correctly. If you are using one of these specific setups, you can instruct the template to seamlessly switch to JSON by passing the `tool_call_format` kwarg:
+
+```json
+{
+  "tool_call_format": "json"
+}
+```
+
+*Note: When you opt into the JSON format, the template explicitly disables the `max_tool_arg_chars` truncation feature. Truncating a serialized JSON string structurally corrupts the JSON, which would poison the model's history and crash downstream parsers.*
+
+---
+
 <details>
 <summary>Technical Details of the Critical Fixes</summary>
 
