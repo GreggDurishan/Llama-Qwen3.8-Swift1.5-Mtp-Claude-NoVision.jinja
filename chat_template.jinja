@@ -139,12 +139,14 @@ Reminder:
 {%- for message in _msgs %}
     {%- set is_system = (message.role == "system" or message.role == "developer") %}
     {%- set content = render_content(message.content, true, is_system) | trim %}
-    {%- if '<|think_off|>' in content %}
-        {%- set ns_state.thinking = false %}
-        {%- set content = content.split('<|think_off|>') | join('') | trim %}
-    {%- elif '<|think_on|>' in content %}
-        {%- set ns_state.thinking = true %}
-        {%- set content = content.split('<|think_on|>') | join('') | trim %}
+    {%- if is_system or message.role == 'user' %}
+        {%- if '<|think_off|>' in content %}
+            {%- set ns_state.thinking = false %}
+            {%- set content = content.split('<|think_off|>') | join('') | trim %}
+        {%- elif '<|think_on|>' in content %}
+            {%- set ns_state.thinking = true %}
+            {%- set content = content.split('<|think_on|>') | join('') | trim %}
+        {%- endif %}
     {%- endif %}
     {%- if is_system %}
         {{- '<|im_start|>system\n' + content + '<|im_end|>\n' }}
