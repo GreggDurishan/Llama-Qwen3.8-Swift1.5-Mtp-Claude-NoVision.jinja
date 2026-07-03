@@ -164,11 +164,12 @@ However, if you are running constrained hardware and need to save context tokens
 
 ## Tool Call Format Override (JSON vs XML)
 
-Qwen is natively trained to output tool calls in XML (`<function=name>`). By default, this template outputs perfectly formatted XML to maximize the model's intelligence and preserve its training distribution. 
+Qwen models are natively trained to output tool calls in XML (`<function=name>`). By default, this template uses this native XML format to maximize the model's intelligence and reliability. 
 
-However, most modern inference engines (including mainline `llama-server`) natively intercept and parse this XML perfectly into standard OpenAI-compatible JSON API responses. 
+**For most users (including those using `vLLM` or `llama.cpp` / `llama-server`), you do NOT need to change anything.** Modern inference engines natively understand Qwen's XML and will automatically translate it into standard OpenAI-compatible API responses for your downstream clients.
 
-The JSON override is only necessary if you are using specific, outdated, or custom setups (such as `ik_llama` wrappers) that rely on hardcoded Hermes-style JSON parsers. If you are using a client that strictly requires JSON tool formatting, you can instruct the template to seamlessly switch by passing the `tool_call_format` kwarg:
+**When to use the JSON override:**
+If you are using a custom wrapper, an older engine version, or a specific framework (like `ik_llama`) that *strictly* expects the model itself to output Hermes-style JSON (`{"name": "...", "arguments": {...}}`) and crashes on XML, you can force the template to use JSON by passing this kwarg:
 
 ```json
 {
@@ -176,7 +177,8 @@ The JSON override is only necessary if you are using specific, outdated, or cust
 }
 ```
 
-*Note: When you opt into the JSON format, the template explicitly disables the `max_tool_arg_chars` truncation feature. Truncating a serialized JSON string structurally corrupts the JSON, which would poison the model's history and crash downstream parsers.*
+> [!WARNING]
+> When you opt into the JSON format, the template explicitly disables the `max_tool_arg_chars` truncation feature. Truncating a JSON string structurally corrupts its syntax, which would poison the model's history and crash downstream parsers.
 
 ---
 
