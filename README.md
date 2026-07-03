@@ -59,23 +59,23 @@ The official Qwen templates contain restrictions and Python-specific Jinja logic
 <details open>
 <summary><b>Critical Issues Fixed</b></summary>
 
-| Category | Problem | Impact | Fix |
-|---|---|---|---|
-| **Agentic Loop** | **Premature Stalls** | Model aborts its turn (`<\|im_end\|>`) when combining conversation and a tool call. | Resolved the System Prompt logic trap and cured "Empty Think" poisoning. |
-| **Agentic Loop** | **Retry Stall & Spirals** | Model diagnoses a tool error but repeatedly emits the identical failing call. | Two-tier escalation: seeds `<think>` with a correction directive, then injects an urgent out-of-band directive. |
-| **Agentic Loop** | **Post-Tool Overthinking** | Forced `<think>` block prefilling causes model to panic and debate internal rules after fetching data. | Broadened instructions to define `<think>` as a dual-purpose space for planning or synthesis. |
-| **Agentic Loop** | **False-Positive Errors** | Short successful API returns containing the word `error` trigger false retry loops. | Strict structural guards look for exact system failures instead of broad words. |
-| **Performance** | **KV Cache Invalidation** | History pruning mutates past turns, causing full prompt re-processing every turn. | `preserve_thinking` defaults to `true`, maintaining strict chronological rendering for a 100% KV cache hit rate. |
-| **Performance** | **Empty Think Poisoning** | Stripped past turns leave empty `<think></think>` tags, tricking the model into an in-context learning bias. | Template abolishes the injection of empty think blocks. |
-| **Compatibility** | **Legacy Engine Crashes** | Older C++ parsing engines crash when evaluating `loop.previtem`. | Uses strict chronological array indexing universally supported by all Jinja iterations. |
-| **Compatibility** | **Wrong Tool Call Format** | Qwen native parsers expect XML `<function=name>`. JSON format breaks them. | Restored native XML format while keeping C++ safety. |
-| **Compatibility** | **Jinja C++ Crashes** | Python-specific filters crash on `minijinja`. | All filters replaced with universally compatible equivalents. |
-| **Stability** | **Mid-Conversation Crash** | Frameworks injecting mid-conversation steering instructions trigger a hard crash. | Native chronological rendering for system messages anywhere in the history. |
-| **Stability** | **No User Query Crash** | `raise_exception` crashes agentic loops or system-only contexts. | Graceful fallback implemented. |
-| **Stability** | **Unclosed Thinking** | Model calls a tool without closing its reasoning, bleeding XML tags into tool parsers. | Auto-injects closing tags before tool boundaries. |
-| **Edge Cases** | **`developer` Role Rejected** | Modern APIs send the developer role; the official template rejects it. | Added full support for `"developer"`. |
-| **Edge Cases** | **`--reasoning off` Ignored** | When thinking is disabled, tool error escalation still opens a `<think>` block, corrupting the prompt. | Error escalation branches fully respect `enable_thinking=false`. |
-| **Edge Cases** | **Hallucinations** | When thinking is disabled, Qwen models inherently hallucinate reasoning tags anyway. | Injects a safe boundary to force reasoning bypass without stacking newlines. |
+| Area | Issue | The Fix |
+|---|---|---|
+| **Agentic Loop** | Model aborts turn when combining chat and a tool call. | Cured "Empty Think" poisoning. |
+| **Agentic Loop** | Model gets stuck emitting the identical failing tool call. | Added two-tier error escalation to force correction. |
+| **Agentic Loop** | Model panics and debates internal rules after fetching data. | Broadened `<think>` instructions to allow synthesis. |
+| **Agentic Loop** | API returns containing the word "error" trigger false loops. | Replaced broad matching with strict structural guards. |
+| **Performance** | Mutated past turns constantly destroy the prefix cache. | Enforced chronological history for a 100% KV Cache hit rate. |
+| **Performance** | Deep Jinja nesting drops `llama.cpp` speed by 80%. | Flattened the AST architecture to maximize throughput. |
+| **Compatibility** | Python-specific filters crash C++ inference engines. | Rewrote all filters to be 100% `minijinja` safe. |
+| **Compatibility** | Qwen-native parsers (like vLLM) crash on JSON formatting. | Restored canonical Qwen XML format as the default. |
+| **Compatibility** | Older API setups and wrappers crash on native XML. | Added a `tool_call_format="json"` opt-in override. |
+| **Compatibility** | Anthropic `message.thinking` payloads are rejected. | Added native Anthropic reasoning support. |
+| **Stability** | Massive tool data returns blow out the context window. | Added dynamic payload truncation limits. |
+| **Stability** | Mid-conversation system prompts crash the template. | Added native support for arbitrary system messages. |
+| **Stability** | Model calls a tool without closing its reasoning tags. | Auto-injects closing tags before tool boundaries. |
+| **Edge Cases** | Text occasionally duplicates during streaming generation. | Restored canonical spacing to the generation prompt. |
+| **Edge Cases** | Model hallucinates reasoning tags when thinking is disabled. | Injected strict boundaries to force reasoning bypass. |
 
 </details>
 
