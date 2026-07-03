@@ -191,6 +191,15 @@ Python-only Jinja2 features crash or misbehave on `minijinja` (the C++ runtime u
 * `map('string')` became `join('|')`
 * `\| first` became `'$ ' in content`
 
+### 7. AST Flattening for C++ Throughput
+Deeply nested Jinja loops and macros create severe parsing bottlenecks in C++ inference engines. We flattened the AST architecture, effectively curing an 80% inference throughput drop on `llama.cpp` by streamlining how `ns_state` tracking and historical rendering loops are evaluated.
+
+### 8. Dynamic Payload Truncation
+Massive API or database returns can instantly blow out a model's context window. We implemented `max_tool_arg_chars` and `max_tool_response_chars` limiters that safely slice oversized payloads. Crucially, this truncation is automatically disabled when the `tool_call_format="json"` override is active, as slicing a serialized JSON string structurally corrupts the data and crashes downstream parsers.
+
+### 9. Reasoning Bypass Hallucination Mitigation
+When thinking is disabled, Qwen models often hallucinate reasoning tags due to their training bias. We injected a safe boundary and adjusted the `<IMPORTANT>` system block to remove explicit mentions of `</think>` during tool instructions. This successfully stops the model from hallucinating closing tags when attempting to call tools in a no-reasoning state.
+
 </details>
 
 <details>
