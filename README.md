@@ -22,7 +22,8 @@ It works across LM Studio, llama.cpp, vLLM, MLX, oMLX, and any engine that suppo
 
 ---
 
-## Quick Install
+<details>
+<summary><b>Quick Install</b></summary>
 
 Choose your environment and update the template:
 
@@ -46,6 +47,8 @@ Replace the `"chat_template"` string in your `tokenizer_config.json` with the ra
 
 ### oMLX
 Overwrite `chat_template.jinja` in your local model directory. Load with `--jinja`. Remove any `chat_template_kwargs` overrides because the template handles everything internally.
+
+</details>
 
 ---
 
@@ -76,28 +79,7 @@ The official Qwen templates contain restrictions and Python-specific Jinja logic
 
 </details>
 
-<details open>
-<summary><b>Comparison Matrix</b></summary>
 
-| Feature | Official Qwen Templates | LuffyTheFox | mod-ellary | Pneuny | **This Fixed Template (v21)** |
-|---------|----------|-------------|------------|--------|----------------|
-| Tool call format | XML | JSON | JSON | JSON | **XML (qwen3_coder compatible)** |
-| Tool arguments | Fails (`\|items`) | Fixed | Missing | Fixed | **Fixed (C++ safe XML)** |
-| Premature Stalls | Stalls | Stalls | Stalls | Stalls | **Fixed** |
-| Agentic Retry Stall | Stalls | Stalls | Stalls | Stalls | **Two-tier escalation system** |
-| False-positive errors | N/A | N/A | N/A | N/A | **Guarded** |
-| Post-Tool Overthinking | Spams/Stalls | Broken | Broken | Broken | **Universal Synthesis** |
-| `--reasoning off` | N/A | N/A | N/A | N/A | **Fully respected** |
-| `developer` role | Missing | Missing | Missing | Missing | **Added** |
-| Thinking toggle | None | None | `/think` | None | **`<\|think_off\|>` anywhere** |
-| Empty think in history | Spams empty blocks | Broken | Tags omitted | Broken | **Abolished completely** |
-| KV prefix caching | Breaks | Breaks | Breaks | Breaks | **100% stable out of the box** |
-| Mid-conversation system | Crashes | Crashes | Crashes | Crashes | **Fixed** |
-| No user query crash | Crashes | Crashes | Crashes | Crashes | **Graceful fallback** |
-| Legacy AST support | Fails | Fails | Fails | Fails | **Fixed** |
-| `</thinking>` hallucination | Fails | N/A | N/A | N/A | **Detected and trimmed** |
-
-</details>
 
 ---
 
