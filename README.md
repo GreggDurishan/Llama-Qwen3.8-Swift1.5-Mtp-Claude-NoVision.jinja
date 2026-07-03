@@ -68,7 +68,7 @@ The official Qwen templates contain restrictions and Python-specific Jinja logic
 | **Performance** | Mutated past turns constantly destroy the prefix cache. | Enforced chronological history for a 100% KV Cache hit rate. |
 | **Performance** | Deep Jinja nesting drops `llama.cpp` speed by 80%. | Flattened the AST architecture to maximize throughput. |
 | **Compatibility** | Python-specific filters crash C++ inference engines. | Rewrote all filters to be 100% `minijinja` safe. |
-| **Compatibility** | Qwen-native parsers (like vLLM) crash on JSON formatting. | Restored canonical Qwen XML format as the default. |
+| **Compatibility** | Qwen-native parsers (like vLLM) crash on JSON formatting. | Maintained canonical Qwen XML format as the default. |
 | **Compatibility** | Older API setups and wrappers crash on native XML. | Added a `tool_call_format="json"` opt-in override. |
 | **Compatibility** | Anthropic `message.thinking` payloads are rejected. | Added native Anthropic reasoning support. |
 | **Stability** | Massive tool data returns blow out the context window. | Added dynamic payload truncation limits. |
