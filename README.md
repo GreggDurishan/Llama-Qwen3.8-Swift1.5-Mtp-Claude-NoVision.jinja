@@ -19,7 +19,7 @@ tags:
 <details open>
 <summary><b>Update History & Changelog (v21)</b></summary>
 
-> **2026-07-02 Update (v21.3): Optional JSON Tool Format Kwarg.** Added an optional `tool_call_format="json"` override for the `chat_template_kwargs`. This provides an escape hatch for users on specific C++ engine setups (like `llama.cpp`'s internal tool parser) that require Hermes-style JSON formatting, without breaking the canonical XML default or degrading the model's primary training distribution. `max_tool_arg_chars` truncation is safely bypassed in JSON mode to prevent syntax corruption.
+> **2026-07-02 Update (v21.3): Optional JSON Tool Format Kwarg.** Added an optional `tool_call_format="json"` override for the `chat_template_kwargs`. This provides an escape hatch for users on specific setups (like custom wrappers or older engines that only support Hermes-style JSON parsing) without breaking the canonical XML default or degrading the model's primary training distribution. `max_tool_arg_chars` truncation is safely bypassed in JSON mode to prevent syntax corruption.
 
 > **2026-07-02 Update (v21.2): Reasoning Bypass Hallucination Fix.** Adjusted the `<IMPORTANT>` block instructions to remove explicit mentions of `</think>` when defining tool-call behavior. This brilliantly stops the model from hallucinating `</think>` tags as a prefix when reasoning is explicitly disabled.
 
@@ -166,7 +166,9 @@ However, if you are running constrained hardware and need to save context tokens
 
 Qwen is natively trained to output tool calls in XML (`<function=name>`). By default, this template outputs perfectly formatted XML to maximize the model's intelligence and preserve its training distribution. 
 
-However, some C++ inference engine setups (like `llama-server`'s internal tool interception) may strictly require Hermes-style JSON formatting to parse tool calls correctly. If you are using one of these specific setups, you can instruct the template to seamlessly switch to JSON by passing the `tool_call_format` kwarg:
+However, most modern inference engines (including mainline `llama-server`) natively intercept and parse this XML perfectly into standard OpenAI-compatible JSON API responses. 
+
+The JSON override is only necessary if you are using specific, outdated, or custom setups (such as `ik_llama` wrappers) that rely on hardcoded Hermes-style JSON parsers. If you are using a client that strictly requires JSON tool formatting, you can instruct the template to seamlessly switch by passing the `tool_call_format` kwarg:
 
 ```json
 {
