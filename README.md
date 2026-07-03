@@ -53,7 +53,8 @@ Overwrite `chat_template.jinja` in your local model directory. Load with `--jinj
 
 The official Qwen templates contain restrictions and Python-specific Jinja logic that break usage on many inference engines and agent frameworks.
 
-Here are the critical issues this template fixes:
+<details open>
+<summary><b>Critical Issues Fixed</b></summary>
 
 | Category | Problem | Impact | Fix |
 |---|---|---|---|
@@ -73,7 +74,10 @@ Here are the critical issues this template fixes:
 | **Edge Cases** | **`--reasoning off` Ignored** | When thinking is disabled, tool error escalation still opens a `<think>` block, corrupting the prompt. | Error escalation branches fully respect `enable_thinking=false`. |
 | **Edge Cases** | **Hallucinations** | When thinking is disabled, Qwen models inherently hallucinate reasoning tags anyway. | Injects a safe boundary to force reasoning bypass without stacking newlines. |
 
-### Comparison Matrix
+</details>
+
+<details open>
+<summary><b>Comparison Matrix</b></summary>
 
 | Feature | Official Qwen Templates | LuffyTheFox | mod-ellary | Pneuny | **This Fixed Template (v21)** |
 |---------|----------|-------------|------------|--------|----------------|
@@ -93,11 +97,15 @@ Here are the critical issues this template fixes:
 | Legacy AST support | Fails | Fails | Fails | Fails | **Fixed** |
 | `</thinking>` hallucination | Fails | N/A | N/A | N/A | **Detected and trimmed** |
 
+</details>
+
 ---
 
 ## Customization & Usage
 
-### The Thinking Toggle
+<details>
+<summary><b>The Thinking Toggle</b></summary>
+
 You can control the model reasoning behavior. Insert `<|think_on|>` or `<|think_off|>` anywhere in your system or user prompt. The template intercepts the tag, removes it from the final context so the model never sees it, and flips the reasoning mode instantly.
 
 **Fast answer, no reasoning:**
@@ -113,7 +121,11 @@ User: Implement a red-black tree in Rust.
 ```
 *(The tag syntax uses Qwen's control token delimiters to guarantee it will never collide with legitimate text or file paths, unlike earlier community templates that used `/think`)*
 
-### Token Saving (Stripping past thoughts)
+</details>
+
+<details>
+<summary><b>Token Saving (Stripping past thoughts)</b></summary>
+
 By default, this template **preserves** all past `<think>` blocks in the chat history. This prevents the model from suffering "amnesia stalls" during complex agentic loops, and it mathematically guarantees a 100% Prefix KV Cache hit rate on local inference engines.
 
 If you are running constrained hardware and need to save context tokens, you can explicitly disable this feature in your engine's template kwargs to automatically strip past thoughts:
@@ -124,7 +136,11 @@ If you are running constrained hardware and need to save context tokens, you can
 ```
 *(Note: Setting this to false will reduce your KV Cache hit rate during multi-turn chats because the prompt string will dynamically mutate).*
 
-### Tool Call Format Override (JSON vs XML)
+</details>
+
+<details>
+<summary><b>Tool Call Format Override (JSON vs XML)</b></summary>
+
 Qwen models are natively trained to output tool calls in XML (`<function=name>`). By default, this template uses this native XML format to maximize the model's intelligence and reliability. 
 
 **For most users (including those using `vLLM` or `llama.cpp` / `llama-server`), you do NOT need to change anything.** Modern inference engines natively understand Qwen's XML and will automatically translate it into standard OpenAI API responses for your downstream clients.
@@ -139,13 +155,19 @@ If you are using a custom wrapper, an older engine version, or a specific framew
 > [!WARNING]
 > When you opt into the JSON format, the template explicitly disables the `max_tool_arg_chars` truncation feature. Truncating a JSON string structurally corrupts its syntax, which would poison the model's history and crash downstream parsers.
 
+</details>
+
 ---
 
-## Running the test suite
+<details>
+<summary><b>Running the test suite</b></summary>
+
 ```bash
 python3 scripts/test_v21.py
 ```
 Tests cover `auto_disable_thinking_with_tools`, payload truncation logic, parallel tool spacing, mid-conversation system rendering, deep agent loop fallback, XML tool format, `<|think_off|>` / `<|think_on|>` inline overrides, and all legacy regression tests.
+
+</details>
 
 ---
 
