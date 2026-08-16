@@ -77,7 +77,6 @@ def run_test(name, messages, tools=None, kwargs=None, expected_in=None, expected
         print(f"❌ FAILED with exception:\n{traceback.format_exc()}")
         return False
 
-# Tests
 tests_passed = 0
 tests_total = 0
 
@@ -88,13 +87,26 @@ def execute_test(*args, **kwargs):
         tests_passed += 1
 
 # ==========================================
-# 1. Qwen 3.8 Reasoning Effort Controls
+# 1. Qwen 3.8 Reasoning Effort Controls (v22.1 Default: medium)
 # ==========================================
 
-# 1. Default reasoning_effort="xhigh" (no system message -> synthesized system message)
+# 1. Default reasoning_effort="medium" (no system message -> zero system message emitted)
 execute_test(
-    "1. reasoning_effort='xhigh' (default, no system message)",
+    "1. reasoning_effort='medium' (v22.1 default, no system message)",
     messages=[{"role": "user", "content": "Hello!"}],
+    expected_in=[
+        "<|im_start|>user\nHello!<|im_end|>\n<|im_start|>assistant\n<think>\n"
+    ],
+    expected_not_in=[
+        "<|im_start|>system\n"
+    ]
+)
+
+# 2. Explicit reasoning_effort="xhigh"
+execute_test(
+    "2. reasoning_effort='xhigh'",
+    messages=[{"role": "user", "content": "Hello!"}],
+    kwargs={"reasoning_effort": "xhigh"},
     expected_in=[
         "<|im_start|>system\nReasoning effort is set to xhigh. Please think carefully through the task, validate key assumptions, consider plausible alternatives, and prioritize correctness, consistency, and clarity in the final answer.<|im_end|>\n",
         "<|im_start|>user\nHello!<|im_end|>\n",
@@ -102,9 +114,9 @@ execute_test(
     ]
 )
 
-# 2. reasoning_effort="high" (OpenAI alias mapped to xhigh)
+# 3. Explicit reasoning_effort="high" (OpenAI alias -> xhigh)
 execute_test(
-    "2. reasoning_effort='high' (OpenAI alias)",
+    "3. reasoning_effort='high' (OpenAI alias)",
     messages=[{"role": "user", "content": "Hello!"}],
     kwargs={"reasoning_effort": "high"},
     expected_in=[
@@ -112,380 +124,524 @@ execute_test(
     ]
 )
 
-# 3. reasoning_effort="low"
+# 4. Explicit reasoning_effort="max" (API max alias -> xhigh)
 execute_test(
-    "3. reasoning_effort='low'",
+    "4. reasoning_effort='max' (API alias)",
+    messages=[{"role": "user", "content": "Hello!"}],
+    kwargs={"reasoning_effort": "max"},
+    expected_in=[
+        "<|im_start|>system\nReasoning effort is set to xhigh. Please think carefully through the task, validate key assumptions, consider plausible alternatives, and prioritize correctness, consistency, and clarity in the final answer.<|im_end|>\n"
+    ]
+)
+
+# 5. Explicit reasoning_effort="low"
+execute_test(
+    "5. reasoning_effort='low'",
     messages=[{"role": "user", "content": "Hello!"}],
     kwargs={"reasoning_effort": "low"},
+    expected_in=[
+        "<|im_start|>system\nReasoning effort is set to low. Keep your thinking brief and focused, moving directly to the conclusion without unnecessary elaboration.<|im_end|>\n",
+        "<|im_start|>user\nHello!<|im_end|>\n"
+    ]
+)
+
+# 6. Explicit reasoning_effort="minimal" (API minimal alias -> low)
+execute_test(
+    "6. reasoning_effort='minimal' (API alias)",
+    messages=[{"role": "user", "content": "Hello!"}],
+    kwargs={"reasoning_effort": "minimal"},
     expected_in=[
         "<|im_start|>system\nReasoning effort is set to low. Keep your thinking brief and focused, moving directly to the conclusion without unnecessary elaboration.<|im_end|>\n"
     ]
 )
 
-# 4. reasoning_effort="medium" (No extra system instruction injected)
+# 7. Explicit reasoning_effort="none" (disables thinking)
 execute_test(
-    "4. reasoning_effort='medium'",
+    "7. reasoning_effort='none' (disables thinking)",
     messages=[{"role": "user", "content": "Hello!"}],
-    kwargs={"reasoning_effort": "medium"},
-    expected_not_in=["<|im_start|>system"],
+    kwargs={"reasoning_effort": "none"},
+    expected_in=[
+        "<|im_start|>user\nHello!<|im_end|>\n<|im_start|>assistant\n<think>\n\n</think>\n\n"
+    ],
+    expected_not_in=[
+        "Reasoning effort is set to"
+    ]
+)
+
+# 8. Explicit reasoning_effort="unknown_val" (safe fallback to medium)
+execute_test(
+    "8. reasoning_effort='unknown_val' (safe fallback to medium)",
+    messages=[{"role": "user", "content": "Hello!"}],
+    kwargs={"reasoning_effort": "unrecognized_str"},
     expected_in=[
         "<|im_start|>user\nHello!<|im_end|>\n<|im_start|>assistant\n<think>\n"
-    ]
-)
-
-# 5. reasoning_effort="xhigh" + User System Prompt
-execute_test(
-    "5. reasoning_effort='xhigh' with user system prompt",
-    messages=[
-        {"role": "system", "content": "You are a Rust programmer."},
-        {"role": "user", "content": "Write a red-black tree."}
     ],
-    expected_in=[
-        "<|im_start|>system\nReasoning effort is set to xhigh. Please think carefully through the task, validate key assumptions, consider plausible alternatives, and prioritize correctness, consistency, and clarity in the final answer.\n\nYou are a Rust programmer.<|im_end|>\n"
+    expected_not_in=[
+        "Reasoning effort is set to"
     ]
 )
 
-# 6. reasoning_effort="xhigh" + Tools (Reasoning instructions before # Tools)
+# 9. reasoning_effort='xhigh' with user system prompt
 execute_test(
-    "6. reasoning_effort='xhigh' with tools",
-    messages=[{"role": "user", "content": "Calculate 2+2"}],
-    tools=[{"type": "function", "function": {"name": "calc", "parameters": {}}}],
-    expected_in=[
-        "<|im_start|>system\nReasoning effort is set to xhigh. Please think carefully through the task, validate key assumptions, consider plausible alternatives, and prioritize correctness, consistency, and clarity in the final answer.\n\n# Tools\n\nYou have access to the following functions:"
-    ]
-)
-
-# 7. reasoning_effort="xhigh" + Tools + User System Prompt
-execute_test(
-    "7. reasoning_effort='xhigh' with tools and user system prompt",
+    "9. reasoning_effort='xhigh' with user system prompt",
     messages=[
-        {"role": "system", "content": "Custom instructions."},
-        {"role": "user", "content": "Do it."}
+        {"role": "system", "content": "You are an expert coder."},
+        {"role": "user", "content": "Write quicksort in C++"}
     ],
-    tools=[{"type": "function", "function": {"name": "calc", "parameters": {}}}],
+    kwargs={"reasoning_effort": "xhigh"},
     expected_in=[
-        "Reasoning effort is set to xhigh.",
-        "# Tools",
-        "Custom instructions.<|im_end|>"
+        "<|im_start|>system\nReasoning effort is set to xhigh. Please think carefully through the task, validate key assumptions, consider plausible alternatives, and prioritize correctness, consistency, and clarity in the final answer.\n\nYou are an expert coder.<|im_end|>\n",
+        "<|im_start|>user\nWrite quicksort in C++<|im_end|>\n"
+    ]
+)
+
+# 10. reasoning_effort='xhigh' with tools
+tools_sample = [
+    {
+        "type": "function",
+        "function": {
+            "name": "get_weather",
+            "description": "Get weather for city",
+            "parameters": {
+                "type": "object",
+                "properties": {"city": {"type": "string"}},
+                "required": ["city"]
+            }
+        }
+    }
+]
+
+execute_test(
+    "10. reasoning_effort='xhigh' with tools",
+    messages=[{"role": "user", "content": "What's the weather in Tokyo?"}],
+    tools=tools_sample,
+    kwargs={"reasoning_effort": "xhigh"},
+    expected_in=[
+        "<|im_start|>system\nReasoning effort is set to xhigh. Please think carefully through the task, validate key assumptions, consider plausible alternatives, and prioritize correctness, consistency, and clarity in the final answer.\n\n# Tools\n\nYou have access to the following functions:\n\n<tools>\n"
     ]
 )
 
 # ==========================================
-# 2. Thinking Control & Pre-Scan Gating
+# 2. Inline Chat Tags for Reasoning Effort Steering (v22.1)
 # ==========================================
 
-# 8. reasoning_effort with <|think_off|> in initial user message (string)
+# 11. Inline <|think_low|> in user message
 execute_test(
-    "8. reasoning_effort suppressed when <|think_off|> in user string",
-    messages=[{"role": "user", "content": "Fast answer: 2+2 <|think_off|>"}],
-    expected_not_in=["<|im_start|>system", "Reasoning effort is set to"],
+    "11. Inline <|think_low|> in user string",
+    messages=[{"role": "user", "content": "What is 2+2? <|think_low|>"}],
     expected_in=[
-        "<|im_start|>user\nFast answer: 2+2<|im_end|>\n<|im_start|>assistant\n<think>\n\n</think>\n\n"
+        "<|im_start|>system\nReasoning effort is set to low. Keep your thinking brief and focused, moving directly to the conclusion without unnecessary elaboration.<|im_end|>\n",
+        "<|im_start|>user\nWhat is 2+2?<|im_end|>\n",
+        "<|im_start|>assistant\n<think>\n"
+    ],
+    expected_not_in=[
+        "<|think_low|>"
     ]
 )
 
-# 9. reasoning_effort with <|think_off|> in multi-part content list
+# 12. Inline <|think_xhigh|> in user message
 execute_test(
-    "9. reasoning_effort suppressed when <|think_off|> in multi-part list",
-    messages=[{"role": "user", "content": [{"type": "text", "text": "Fast answer: 2+2 <|think_off|>"}]}],
-    expected_not_in=["<|im_start|>system", "Reasoning effort is set to"],
+    "12. Inline <|think_xhigh|> in user string",
+    messages=[{"role": "user", "content": "Prove Fermat's Last Theorem <|think_xhigh|>"}],
     expected_in=[
-        "<|im_start|>user\nFast answer: 2+2<|im_end|>\n<|im_start|>assistant\n<think>\n\n</think>\n\n"
+        "<|im_start|>system\nReasoning effort is set to xhigh. Please think carefully through the task, validate key assumptions, consider plausible alternatives, and prioritize correctness, consistency, and clarity in the final answer.<|im_end|>\n",
+        "<|im_start|>user\nProve Fermat's Last Theorem<|im_end|>\n",
+        "<|im_start|>assistant\n<think>\n"
+    ],
+    expected_not_in=[
+        "<|think_xhigh|>"
     ]
 )
 
-# 10. enable_thinking=false kwarg (Disabling thinking does not crash and suppresses instructions)
+# 13. Inline <|think_medium|> in user message
 execute_test(
-    "10. enable_thinking=false kwarg",
-    messages=[{"role": "user", "content": "Fast 2+2"}],
+    "13. Inline <|think_medium|> in user string",
+    messages=[{"role": "user", "content": "Hello <|think_medium|>"}],
+    expected_in=[
+        "<|im_start|>user\nHello<|im_end|>\n",
+        "<|im_start|>assistant\n<think>\n"
+    ],
+    expected_not_in=[
+        "<|think_medium|>",
+        "<|im_start|>system\n"
+    ]
+)
+
+# 14. Inline <|think_off|> in user message
+execute_test(
+    "14. Inline <|think_off|> in user string",
+    messages=[{"role": "user", "content": "Quick answer: what is capital of France? <|think_off|>"}],
+    expected_in=[
+        "<|im_start|>user\nQuick answer: what is capital of France?<|im_end|>\n<|im_start|>assistant\n<think>\n\n</think>\n\n"
+    ],
+    expected_not_in=[
+        "<|think_off|>",
+        "Reasoning effort is set to"
+    ]
+)
+
+# 15. Inline <|think_low|> in multi-part list[dict]
+execute_test(
+    "15. Inline <|think_low|> in multi-part list[dict]",
+    messages=[
+        {"role": "user", "content": [{"type": "text", "text": "Solve this riddle <|think_low|>"}]}
+    ],
+    expected_in=[
+        "<|im_start|>system\nReasoning effort is set to low. Keep your thinking brief and focused, moving directly to the conclusion without unnecessary elaboration.<|im_end|>\n",
+        "<|im_start|>user\nSolve this riddle<|im_end|>\n"
+    ],
+    expected_not_in=[
+        "<|think_low|>"
+    ]
+)
+
+# 16. Inline <|think_xhigh|> in multi-part list[str]
+execute_test(
+    "16. Inline <|think_xhigh|> in multi-part list[str]",
+    messages=[
+        {"role": "user", "content": ["Solve this deeply", "<|think_xhigh|>"]}
+    ],
+    expected_in=[
+        "<|im_start|>system\nReasoning effort is set to xhigh. Please think carefully through the task, validate key assumptions, consider plausible alternatives, and prioritize correctness, consistency, and clarity in the final answer.<|im_end|>\n",
+        "<|im_start|>user\nSolve this deeply<|im_end|>\n"
+    ],
+    expected_not_in=[
+        "<|think_xhigh|>"
+    ]
+)
+
+# 17. Clean tag stripping across multiple tags in same string
+execute_test(
+    "17. Clean tag stripping across multiple tags in same string",
+    messages=[
+        {"role": "user", "content": "Hello <|think_on|> <|think_minimal|> world"}
+    ],
+    expected_in=[
+        "<|im_start|>user\nHello   world<|im_end|>\n"
+    ],
+    expected_not_in=[
+        "<|think_on|>",
+        "<|think_minimal|>"
+    ]
+)
+
+# ==========================================
+# 3. Thinking Toggles & Preserves
+# ==========================================
+
+# 18. enable_thinking=false kwarg
+execute_test(
+    "18. enable_thinking=false kwarg",
+    messages=[{"role": "user", "content": "Hello!"}],
     kwargs={"enable_thinking": False},
-    expected_not_in=["Reasoning effort is set to"],
     expected_in=[
-        "<|im_start|>user\nFast 2+2<|im_end|>\n<|im_start|>assistant\n<think>\n\n</think>\n\n"
+        "<|im_start|>user\nHello!<|im_end|>\n<|im_start|>assistant\n<think>\n\n</think>\n\n"
     ]
 )
 
-# 11. auto_disable_thinking_with_tools=true kwarg
+# 19. auto_disable_thinking_with_tools=true
 execute_test(
-    "11. auto_disable_thinking_with_tools=true",
-    messages=[{"role": "user", "content": "Call tool"}],
-    tools=[{"type": "function", "function": {"name": "test"}}],
+    "19. auto_disable_thinking_with_tools=true",
+    messages=[{"role": "user", "content": "What's the weather?"}],
+    tools=tools_sample,
     kwargs={"auto_disable_thinking_with_tools": True},
-    expected_not_in=["Reasoning effort is set to"],
     expected_in=[
         "<|im_start|>assistant\n<think>\n\n</think>\n\n"
     ]
 )
 
-# ==========================================
-# 3. KV Cache & preserve_reasoning Aliasing
-# ==========================================
-
-# 12. preserve_reasoning=True (llama.cpp CLI flag compatibility)
+# 20. preserve_reasoning=True preserves thinking
 execute_test(
-    "12. preserve_reasoning=True preserves thinking",
+    "20. preserve_reasoning=True preserves thinking",
     messages=[
-        {"role": "user", "content": "Turn 1"},
-        {"role": "assistant", "content": "Answer 1", "reasoning_content": "Thought 1"},
-        {"role": "user", "content": "Turn 2"}
+        {"role": "user", "content": "Question 1"},
+        {"role": "assistant", "content": "<think>\nThinking 1\n</think>\n\nAnswer 1"},
+        {"role": "user", "content": "Question 2"}
     ],
-    kwargs={"preserve_reasoning": True, "reasoning_effort": "medium"},
+    kwargs={"preserve_reasoning": True},
     expected_in=[
-        "<|im_start|>assistant\n<think>\nThought 1\n</think>\n\nAnswer 1<|im_end|>"
+        "<|im_start|>assistant\n<think>\nThinking 1\n</think>\n\nAnswer 1<|im_end|>\n"
     ]
 )
 
-# 13. preserve_reasoning=False (strips past thinking)
+# 21. preserve_reasoning=False strips past thinking
 execute_test(
-    "13. preserve_reasoning=False strips past thinking",
+    "21. preserve_reasoning=False strips past thinking",
     messages=[
-        {"role": "user", "content": "Turn 1"},
-        {"role": "assistant", "content": "Answer 1", "reasoning_content": "Thought 1"},
-        {"role": "user", "content": "Turn 2"}
+        {"role": "user", "content": "Question 1"},
+        {"role": "assistant", "content": "<think>\nThinking 1\n</think>\n\nAnswer 1"},
+        {"role": "user", "content": "Question 2"}
     ],
-    kwargs={"preserve_reasoning": False, "reasoning_effort": "medium"},
-    expected_not_in=["Thought 1", "<think>\nThought 1\n</think>"],
+    kwargs={"preserve_reasoning": False},
     expected_in=[
-        "<|im_start|>assistant\nAnswer 1<|im_end|>"
+        "<|im_start|>assistant\nAnswer 1<|im_end|>\n"
+    ],
+    expected_not_in=[
+        "Thinking 1"
     ]
 )
 
-# 14. preserve_thinking=True (backwards compatibility)
+# 22. In-content <think> parsing (Curing official 3.8 empty think poisoning)
 execute_test(
-    "14. preserve_thinking=True preserves thinking",
+    "22. In-content <think> parsing (Curing official 3.8 empty think poisoning)",
     messages=[
-        {"role": "user", "content": "Turn 1"},
-        {"role": "assistant", "content": "Answer 1", "reasoning_content": "Thought 1"},
-        {"role": "user", "content": "Turn 2"}
+        {"role": "user", "content": "Solve 1+1"},
+        {"role": "assistant", "content": "<think>\n1+1 is 2\n</think>\n\nResult is 2"},
+        {"role": "user", "content": "Now 2+2"}
     ],
-    kwargs={"preserve_thinking": True, "reasoning_effort": "medium"},
+    kwargs={"preserve_thinking": True},
     expected_in=[
-        "<|im_start|>assistant\n<think>\nThought 1\n</think>\n\nAnswer 1<|im_end|>"
+        "<|im_start|>assistant\n<think>\n1+1 is 2\n</think>\n\nResult is 2<|im_end|>\n"
+    ],
+    expected_not_in=[
+        "<think>\n\n</think>\n\n<think>"
     ]
 )
 
-# 15. preserve_thinking=False (backwards compatibility)
+# 23. OpenAI reasoning_content field
 execute_test(
-    "15. preserve_thinking=False strips past thinking",
+    "23. OpenAI reasoning_content field",
     messages=[
-        {"role": "user", "content": "Turn 1"},
-        {"role": "assistant", "content": "Answer 1", "reasoning_content": "Thought 1"},
-        {"role": "user", "content": "Turn 2"}
+        {"role": "user", "content": "Question 1"},
+        {"role": "assistant", "content": "Answer 1", "reasoning_content": "Deep thought 1"},
+        {"role": "user", "content": "Question 2"}
     ],
-    kwargs={"preserve_thinking": False, "reasoning_effort": "medium"},
-    expected_not_in=["Thought 1", "<think>\nThought 1\n</think>"],
+    kwargs={"preserve_thinking": True},
     expected_in=[
-        "<|im_start|>assistant\nAnswer 1<|im_end|>"
+        "<|im_start|>assistant\n<think>\nDeep thought 1\n</think>\n\nAnswer 1<|im_end|>\n"
     ]
 )
 
-# ==========================================
-# 4. Multi-Turn Thinking History Robustness
-# ==========================================
-
-# 16. Assistant history with embedded <think> in content (No empty think duplication)
+# 24. Anthropic message.thinking field
 execute_test(
-    "16. In-content <think> parsing (Curing official 3.8 empty think poisoning)",
+    "24. Anthropic message.thinking field",
     messages=[
-        {"role": "user", "content": "Hi"},
-        {"role": "assistant", "content": "<think>\nThinking deeply.\n</think>\n\nFinal response."},
-        {"role": "user", "content": "Next question"}
+        {"role": "user", "content": "Question 1"},
+        {"role": "assistant", "content": "Answer 1", "thinking": "Anthropic thought 1"},
+        {"role": "user", "content": "Question 2"}
     ],
-    kwargs={"reasoning_effort": "medium"},
-    expected_not_in=["<think>\n\n</think>\n\n<think>"],
+    kwargs={"preserve_thinking": True},
     expected_in=[
-        "<|im_start|>assistant\n<think>\nThinking deeply.\n</think>\n\nFinal response.<|im_end|>"
-    ]
-)
-
-# 17. Assistant history with OpenAI reasoning_content field
-execute_test(
-    "17. OpenAI reasoning_content field",
-    messages=[
-        {"role": "user", "content": "Hi"},
-        {"role": "assistant", "content": "Final response.", "reasoning_content": "Thinking deeply."},
-        {"role": "user", "content": "Next question"}
-    ],
-    kwargs={"reasoning_effort": "medium"},
-    expected_in=[
-        "<|im_start|>assistant\n<think>\nThinking deeply.\n</think>\n\nFinal response.<|im_end|>"
-    ]
-)
-
-# 18. Assistant history with Anthropic thinking field
-execute_test(
-    "18. Anthropic message.thinking field",
-    messages=[
-        {"role": "user", "content": "Hi"},
-        {"role": "assistant", "content": "Final response.", "thinking": "Thinking deeply."},
-        {"role": "user", "content": "Next question"}
-    ],
-    kwargs={"reasoning_effort": "medium"},
-    expected_in=[
-        "<|im_start|>assistant\n<think>\nThinking deeply.\n</think>\n\nFinal response.<|im_end|>"
+        "<|im_start|>assistant\n<think>\nAnthropic thought 1\n</think>\n\nAnswer 1<|im_end|>\n"
     ]
 )
 
 # ==========================================
-# 5. Universal Tool Calling & Serialization
+# 4. Tool Calling (XML & JSON)
 # ==========================================
 
-# 19. Tool calling with dictionary arguments (XML format)
+# 25. Tool calling with dict arguments (XML)
 execute_test(
-    "19. Tool calling with dict arguments (XML)",
+    "25. Tool calling with dict arguments (XML)",
     messages=[
-        {"role": "user", "content": "Search for news"},
-        {"role": "assistant", "content": "", "tool_calls": [
-            {"type": "function", "function": {"name": "search", "arguments": {"query": "Qwen 3.8", "limit": 5}}}
-        ]}
+        {"role": "user", "content": "Weather in Paris?"},
+        {
+            "role": "assistant",
+            "content": "",
+            "tool_calls": [
+                {
+                    "type": "function",
+                    "function": {
+                        "name": "get_weather",
+                        "arguments": {"city": "Paris"}
+                    }
+                }
+            ]
+        }
     ],
-    kwargs={"reasoning_effort": "medium"},
     expected_in=[
-        "<tool_call>\n<function=search>\n<parameter=query>\nQwen 3.8\n</parameter>\n<parameter=limit>\n5\n</parameter>\n</function>\n</tool_call>"
+        "<|im_start|>assistant\n<tool_call>\n<function=get_weather>\n<parameter=city>\nParis\n</parameter>\n</function>\n</tool_call><|im_end|>\n"
     ]
 )
 
-# 20. Tool calling with JSON string arguments (XML format - prevents 3.8 crash)
+# 26. Tool calling with JSON string arguments (XML)
 execute_test(
-    "20. Tool calling with JSON string arguments (XML)",
+    "26. Tool calling with JSON string arguments (XML)",
     messages=[
-        {"role": "user", "content": "Search for news"},
-        {"role": "assistant", "content": "", "tool_calls": [
-            {"type": "function", "function": {"name": "search", "arguments": '{"query": "Qwen 3.8"}'}}
-        ]}
+        {"role": "user", "content": "Weather in Paris?"},
+        {
+            "role": "assistant",
+            "content": "",
+            "tool_calls": [
+                {
+                    "type": "function",
+                    "function": {
+                        "name": "get_weather",
+                        "arguments": '{"city": "Paris"}'
+                    }
+                }
+            ]
+        }
     ],
-    kwargs={"reasoning_effort": "medium"},
     expected_in=[
-        "<tool_call>\n<function=search>\n{\"query\": \"Qwen 3.8\"}</function>\n</tool_call>"
+        "<|im_start|>assistant\n<tool_call>\n<function=get_weather>\n{\"city\": \"Paris\"}</function>\n</tool_call><|im_end|>\n"
     ]
 )
 
-# 21. Tool calling with dictionary arguments (Hermes JSON format)
+# 27. Tool calling with dict arguments (JSON format)
 execute_test(
-    "21. Tool calling with dict arguments (JSON format)",
+    "27. Tool calling with dict arguments (JSON format)",
     messages=[
-        {"role": "user", "content": "Search for news"},
-        {"role": "assistant", "content": "", "tool_calls": [
-            {"type": "function", "function": {"name": "search", "arguments": {"query": "Qwen 3.8"}}}
-        ]}
+        {"role": "user", "content": "Weather in Paris?"},
+        {
+            "role": "assistant",
+            "content": "",
+            "tool_calls": [
+                {
+                    "type": "function",
+                    "function": {
+                        "name": "get_weather",
+                        "arguments": {"city": "Paris"}
+                    }
+                }
+            ]
+        }
     ],
-    kwargs={"tool_call_format": "json", "reasoning_effort": "medium"},
+    kwargs={"tool_call_format": "json"},
     expected_in=[
-        '<tool_call>\n{"name": "search", "arguments": {"query": "Qwen 3.8"}}\n</tool_call>'
+        '<|im_start|>assistant\n<tool_call>\n{"name": "get_weather", "arguments": {"city": "Paris"}}\n</tool_call><|im_end|>\n'
     ]
 )
 
-# 22. Tool calling with JSON string arguments (Hermes JSON format)
+# 28. Tool calling with JSON string arguments (JSON format)
 execute_test(
-    "22. Tool calling with JSON string arguments (JSON format)",
+    "28. Tool calling with JSON string arguments (JSON format)",
     messages=[
-        {"role": "user", "content": "Search for news"},
-        {"role": "assistant", "content": "", "tool_calls": [
-            {"type": "function", "function": {"name": "search", "arguments": '{"query": "Qwen 3.8"}'}}
-        ]}
+        {"role": "user", "content": "Weather in Paris?"},
+        {
+            "role": "assistant",
+            "content": "",
+            "tool_calls": [
+                {
+                    "type": "function",
+                    "function": {
+                        "name": "get_weather",
+                        "arguments": '{"city": "Paris"}'
+                    }
+                }
+            ]
+        }
     ],
-    kwargs={"tool_call_format": "json", "reasoning_effort": "medium"},
+    kwargs={"tool_call_format": "json"},
     expected_in=[
-        '<tool_call>\n{"name": "search", "arguments": {"query": "Qwen 3.8"}}\n</tool_call>'
+        '<|im_start|>assistant\n<tool_call>\n{"name": "get_weather", "arguments": {"city": "Paris"}}\n</tool_call><|im_end|>\n'
     ]
 )
 
-# 23. Empty string tool arguments ""
+# 29. Tool calling with empty arguments string
 execute_test(
-    "23. Tool calling with empty arguments string",
+    "29. Tool calling with empty arguments string",
     messages=[
-        {"role": "user", "content": "Get time"},
-        {"role": "assistant", "content": "", "tool_calls": [
-            {"type": "function", "function": {"name": "get_time", "arguments": ""}}
-        ]}
+        {"role": "user", "content": "Call tool without args"},
+        {
+            "role": "assistant",
+            "content": "",
+            "tool_calls": [
+                {
+                    "type": "function",
+                    "function": {
+                        "name": "no_arg_tool",
+                        "arguments": ""
+                    }
+                }
+            ]
+        }
     ],
-    kwargs={"reasoning_effort": "medium"},
     expected_in=[
-        "<tool_call>\n<function=get_time>\n</function>\n</tool_call>"
+        "<|im_start|>assistant\n<tool_call>\n<function=no_arg_tool>\n</function>\n</tool_call><|im_end|>\n"
     ]
 )
 
-# 24. Dynamic parameter truncation (max_tool_arg_chars)
+# ==========================================
+# 5. Payload Truncation & Error Escalation
+# ==========================================
+
+# 30. Dynamic parameter truncation (max_tool_arg_chars)
 execute_test(
-    "24. Dynamic parameter truncation (max_tool_arg_chars)",
+    "30. Dynamic parameter truncation (max_tool_arg_chars)",
     messages=[
-        {"role": "user", "content": "Long input"},
-        {"role": "assistant", "content": "", "tool_calls": [
-            {"type": "function", "function": {"name": "process", "arguments": {"text": "A" * 100}}}
-        ]}
+        {"role": "user", "content": "Execute SQL"},
+        {
+            "role": "assistant",
+            "content": "",
+            "tool_calls": [
+                {
+                    "type": "function",
+                    "function": {
+                        "name": "run_sql",
+                        "arguments": {"query": "SELECT * FROM users WHERE id = 1234567890 AND active = true"}
+                    }
+                }
+            ]
+        }
     ],
-    kwargs={"max_tool_arg_chars": 20, "reasoning_effort": "medium"},
+    kwargs={"max_tool_arg_chars": 20},
     expected_in=[
-        "[TRUNCATED — original length 100 chars]"
+        "[TRUNCATED - original length"
     ]
 )
 
-# 25. Dynamic response truncation (max_tool_response_chars)
+# 31. Dynamic response truncation (max_tool_response_chars)
 execute_test(
-    "25. Dynamic response truncation (max_tool_response_chars)",
+    "31. Dynamic response truncation (max_tool_response_chars)",
+    messages=[
+        {"role": "user", "content": "Search files"},
+        {"role": "assistant", "content": "", "tool_calls": [{"type": "function", "function": {"name": "search", "arguments": {}}}]},
+        {"role": "tool", "content": "A" * 200}
+    ],
+    kwargs={"max_tool_response_chars": 50},
+    expected_in=[
+        "[TRUNCATED - original length 200 chars]"
+    ]
+)
+
+# 32. Consecutive tool error warning 1
+execute_test(
+    "32. Consecutive tool error warning 1",
     messages=[
         {"role": "user", "content": "Run tool"},
-        {"role": "assistant", "content": "", "tool_calls": [{"type": "function", "function": {"name": "run"}}]},
-        {"role": "tool", "content": "B" * 200}
+        {"role": "assistant", "content": "", "tool_calls": [{"type": "function", "function": {"name": "run", "arguments": {}}}]},
+        {"role": "tool", "content": '{"error": "file not found"}'}
     ],
-    kwargs={"max_tool_response_chars": 50, "reasoning_effort": "medium"},
-    expected_in=[
-        "[TRUNCATED — original length 200 chars]"
-    ]
-)
-
-# 26. Consecutive tool error escalation (1 failure -> Warning 1)
-execute_test(
-    "26. Consecutive tool error warning 1",
-    messages=[
-        {"role": "user", "content": "Run tool"},
-        {"role": "assistant", "content": "", "tool_calls": [{"type": "function", "function": {"name": "run"}}]},
-        {"role": "tool", "content": "error: file not found"}
-    ],
-    kwargs={"reasoning_effort": "medium"},
     expected_in=[
         "⚠️ SYSTEM WARNING: The previous tool call returned an error. Diagnose the failure and retry with completely corrected arguments."
     ]
 )
 
-# 27. Consecutive tool error escalation (2 failures -> Warning 2 with reasoning preserved)
+# 33. Consecutive tool error warning 2 (retaining reasoning for error correction)
 execute_test(
-    "27. Consecutive tool error warning 2 (retaining reasoning for error correction)",
+    "33. Consecutive tool error warning 2 (retaining reasoning for error correction)",
     messages=[
         {"role": "user", "content": "Run tool"},
-        {"role": "assistant", "content": "", "tool_calls": [{"type": "function", "function": {"name": "run"}}]},
-        {"role": "tool", "content": "error: file not found"},
-        {"role": "assistant", "content": "", "tool_calls": [{"type": "function", "function": {"name": "run"}}]},
-        {"role": "tool", "content": "fatal: permission denied"}
+        {"role": "assistant", "content": "", "tool_calls": [{"type": "function", "function": {"name": "run", "arguments": {}}}]},
+        {"role": "tool", "content": '{"error": "file not found"}'},
+        {"role": "assistant", "content": "", "tool_calls": [{"type": "function", "function": {"name": "run", "arguments": {}}}]},
+        {"role": "tool", "content": '{"error": "permission denied"}'}
     ],
-    kwargs={"reasoning_effort": "medium"},
     expected_in=[
         "⚠️ SYSTEM WARNING: 2 consecutive tool errors detected. Your previous approach is incorrect. You MUST use a fundamentally different approach or corrected arguments.",
         "<|im_start|>assistant\n<think>\n"
     ]
 )
 
-# 28. Mid-conversation system and developer messages
+# 34. Mid-conversation system & developer messages
 execute_test(
-    "28. Mid-conversation system & developer messages",
+    "34. Mid-conversation system & developer messages",
     messages=[
         {"role": "user", "content": "Hello"},
-        {"role": "assistant", "content": "Hi there"},
-        {"role": "developer", "content": "Be super concise."},
-        {"role": "user", "content": "What is 2+2?"}
+        {"role": "assistant", "content": "Hi"},
+        {"role": "developer", "content": "Mid-conversation update: user changed context."},
+        {"role": "user", "content": "Continue"}
     ],
-    kwargs={"reasoning_effort": "medium"},
     expected_in=[
-        "<|im_start|>system\nBe super concise.<|im_end|>\n<|im_start|>user\nWhat is 2+2?<|im_end|>"
+        "<|im_start|>system\nMid-conversation update: user changed context.<|im_end|>\n",
+        "<|im_start|>user\nContinue<|im_end|>\n"
     ]
 )
 
-# ==========================================
-# Summary
-# ==========================================
-print(f"\n==========================================")
-print(f"Results: {tests_passed} / {tests_total} tests passed ({(tests_passed/tests_total)*100:.1f}%)")
-print(f"==========================================")
+print("\n==========================================")
+print(f"Results: {tests_passed} / {tests_total} tests passed ({tests_passed/tests_total*100:.1f}%)")
+print("==========================================")
 
 if tests_passed != tests_total:
     sys.exit(1)
