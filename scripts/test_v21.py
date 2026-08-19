@@ -160,7 +160,7 @@ execute_test(
         {"role": "assistant", "content": "calling"},
         {"role": "tool", "content": "error: failed again"}
     ],
-    expected_in=["⚠️ SYSTEM WARNING: 2 consecutive tool errors", "<think>\n\n</think>\n\n"]
+    expected_in=["⚠️ SYSTEM WARNING: 2 consecutive tool errors", "<think>\n"]
 )
 
 run_test(

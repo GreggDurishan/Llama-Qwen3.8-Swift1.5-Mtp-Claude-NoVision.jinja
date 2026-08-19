@@ -124,11 +124,11 @@ def main():
         sys.exit(1)
     else:
         active_ver = list(unique_versions)[0]
-        if "froggeric-v22.1" in active_ver:
-            print(f"{GREEN}✅ SUCCESS: Verified v22.1 template is cleanly installed!{RESET}\n")
+        if "froggeric-v22.2" in active_ver:
+            print(f"{GREEN}✅ SUCCESS: Verified v22.2 template is cleanly installed!{RESET}\n")
             sys.exit(0)
         elif "froggeric" in active_ver:
-            print(f"{CYAN}ℹ️  INFO: Found earlier fixed template version ({active_ver}). Upgrade to v22.1 recommended.{RESET}\n")
+            print(f"{CYAN}ℹ️  INFO: Found earlier fixed template version ({active_ver}). Upgrade to v22.2 recommended.{RESET}\n")
             sys.exit(0)
         else:
             print(f"{YELLOW}⚠️  Stock / unpatched template detected.{RESET}\n")

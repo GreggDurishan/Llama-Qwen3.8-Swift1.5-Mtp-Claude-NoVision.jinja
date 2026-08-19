@@ -473,6 +473,7 @@ execute_test(
             ]
         }
     ],
+    kwargs={"tool_call_format": "xml"},
     expected_in=[
         "<|im_start|>assistant\n<tool_call>\n<function=get_weather>\n{\"city\": \"Paris\"}</function>\n</tool_call><|im_end|>\n"
     ]
@@ -636,6 +637,163 @@ execute_test(
     expected_in=[
         "<|im_start|>system\nMid-conversation update: user changed context.<|im_end|>\n",
         "<|im_start|>user\nContinue<|im_end|>\n"
+    ]
+)
+
+# ==========================================
+# 3. v22.2 Enhancements & Community Fixes
+# ==========================================
+
+# 35. reasoning_effort='ultracode' (Discussion #78)
+execute_test(
+    "35. reasoning_effort='ultracode'",
+    messages=[{"role": "user", "content": "Analyze algorithm"}],
+    kwargs={"reasoning_effort": "ultracode"},
+    expected_in=[
+        "<|im_start|>system\nReasoning effort is set to xhigh. Please think carefully through the task, validate key assumptions, consider plausible alternatives, and prioritize correctness, consistency, and clarity in the final answer.<|im_end|>\n"
+    ]
+)
+
+# 36. reasoning_effort='extreme'
+execute_test(
+    "36. reasoning_effort='extreme'",
+    messages=[{"role": "user", "content": "Analyze algorithm"}],
+    kwargs={"reasoning_effort": "extreme"},
+    expected_in=[
+        "<|im_start|>system\nReasoning effort is set to xhigh. Please think carefully through the task, validate key assumptions, consider plausible alternatives, and prioritize correctness, consistency, and clarity in the final answer.<|im_end|>\n"
+    ]
+)
+
+# 37. Inline <|think_ultracode|> in user message
+execute_test(
+    "37. Inline <|think_ultracode|> in user message",
+    messages=[{"role": "user", "content": "Optimize this shader <|think_ultracode|>"}],
+    expected_in=[
+        "<|im_start|>system\nReasoning effort is set to xhigh. Please think carefully through the task, validate key assumptions, consider plausible alternatives, and prioritize correctness, consistency, and clarity in the final answer.<|im_end|>\n",
+        "<|im_start|>user\nOptimize this shader<|im_end|>\n"
+    ],
+    expected_not_in=[
+        "<|think_ultracode|>"
+    ]
+)
+
+# 38. Multiple leading system and developer messages merging
+execute_test(
+    "38. Multiple leading system and developer messages merging",
+    messages=[
+        {"role": "system", "content": "Base instructions."},
+        {"role": "developer", "content": "Developer constraints."},
+        {"role": "system", "content": "Additional guidelines."},
+        {"role": "user", "content": "Hello"}
+    ],
+    expected_in=[
+        "<|im_start|>system\nBase instructions.\n\nDeveloper constraints.\n\nAdditional guidelines.<|im_end|>\n",
+        "<|im_start|>user\nHello<|im_end|>\n"
+    ]
+)
+
+# 39. Grep code search with throw Error not false-positiving on tool error (Discussion #66)
+execute_test(
+    "39. Grep code search with throw Error not false-positiving on tool error (Discussion #66)",
+    messages=[
+        {"role": "user", "content": "Search for error handlers"},
+        {"role": "assistant", "content": "", "tool_calls": [{"type": "function", "function": {"name": "grep", "arguments": {"pattern": "failed to"}}}]},
+        {"role": "tool", "content": "src/lib/api.ts:42: throw new Error('failed to fetch');"},
+        {"role": "assistant", "content": "", "tool_calls": [{"type": "function", "function": {"name": "grep", "arguments": {"pattern": "failed to"}}}]},
+        {"role": "tool", "content": "src/lib/auth.ts:18: throw new Error('failed to authenticate');"}
+    ],
+    expected_not_in=[
+        "⚠️ SYSTEM WARNING"
+    ]
+)
+
+# 40. Grep code search with console.error not false-positiving
+execute_test(
+    "40. Grep code search with console.error not false-positiving",
+    messages=[
+        {"role": "user", "content": "Search for error logging"},
+        {"role": "assistant", "content": "", "tool_calls": [{"type": "function", "function": {"name": "grep", "arguments": {"pattern": "console.error"}}}]},
+        {"role": "tool", "content": "src/utils.js:5: console.error('failed to load config');"}
+    ],
+    expected_not_in=[
+        "⚠️ SYSTEM WARNING"
+    ]
+)
+
+# 41. Python Traceback legitimately triggers tool error warning
+execute_test(
+    "41. Python Traceback legitimately triggers tool error warning",
+    messages=[
+        {"role": "user", "content": "Run script"},
+        {"role": "assistant", "content": "", "tool_calls": [{"type": "function", "function": {"name": "python", "arguments": {"code": "1/0"}}}]},
+        {"role": "tool", "content": "Traceback (most recent call last):\n  File 'test.py', line 1\nZeroDivisionError: division by zero"}
+    ],
+    expected_in=[
+        "⚠️ SYSTEM WARNING: The previous tool call returned an error. Diagnose the failure and retry with completely corrected arguments."
+    ]
+)
+
+# 42. Safe XML parameter formatting for booleans, nulls, and numbers
+execute_test(
+    "42. Safe XML parameter formatting for booleans, nulls, and numbers",
+    messages=[
+        {"role": "user", "content": "Call config tool"},
+        {"role": "assistant", "content": "", "tool_calls": [{
+            "type": "function",
+            "function": {
+                "name": "set_config",
+                "arguments": {
+                    "is_active": True,
+                    "is_debug": False,
+                    "retries": 5,
+                    "metadata": None
+                }
+            }
+        }]}
+    ],
+    expected_in=[
+        "<parameter=is_active>\ntrue\n</parameter>",
+        "<parameter=is_debug>\nfalse\n</parameter>",
+        "<parameter=retries>\n5\n</parameter>",
+        "<parameter=metadata>\nnull\n</parameter>"
+    ]
+)
+
+# 43. KV Cache Stability: History with JSON string arguments preserves canonical XML system prompt
+execute_test(
+    "43. KV Cache Stability: History with JSON string arguments preserves canonical XML system prompt",
+    messages=[
+        {"role": "user", "content": "What's the weather?"},
+        {"role": "assistant", "content": "", "tool_calls": [{
+            "type": "function",
+            "function": {
+                "name": "get_weather",
+                "arguments": '{"city": "Paris", "unit": "celsius"}'
+            }
+        }]},
+        {"role": "tool", "content": '{"temp": 22}'}
+    ],
+    tools=tools_sample,
+    expected_in=[
+        "<function=example_function_name>",
+        "<tool_call>\n<function=get_weather>\n{\"city\": \"Paris\", \"unit\": \"celsius\"}</function>\n</tool_call>"
+    ]
+)
+
+# 44. Empty think poisoning prevention regression test
+execute_test(
+    "44. Empty think poisoning prevention regression test",
+    messages=[
+        {"role": "user", "content": "Call tool"},
+        {"role": "assistant", "content": "", "reasoning_content": "", "tool_calls": [{
+            "type": "function",
+            "function": {"name": "fetch", "arguments": {"id": 1}}
+        }]},
+        {"role": "tool", "content": "result data"},
+        {"role": "assistant", "content": "Done!"}
+    ],
+    expected_not_in=[
+        "<think>\n\n</think>"
     ]
 )
 

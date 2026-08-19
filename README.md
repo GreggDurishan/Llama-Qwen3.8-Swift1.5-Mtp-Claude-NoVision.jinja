@@ -15,7 +15,7 @@ tags:
   - thinking
 ---
 
-# Fixed jinja chat templates for Qwen 3.5, 3.6 & 3.8 (v22.1)
+# Fixed jinja chat templates for Qwen 3.5, 3.6 & 3.8 (v22.2)
 
 This is a universal drop-in Jinja template that fixes rendering errors, KV cache invalidation, token waste, empty think poisoning, and fatal agentic stalling across official Qwen chat templates.
 
@@ -23,23 +23,24 @@ It works across LM Studio, llama.cpp, vLLM, MLX, oMLX, KoboldCPP, and any engine
 
 ---
 
-## What is new: The Qwen 3.8 Update
+## What is New with Qwen 3.8 (v22 / v22.1 / v22.2)
 
-Qwen has released their 3.8 generation starting with `Qwen3.8-2.4T-A95B` and `Qwen3.8-27B`. While the official 3.8 template adopted our default reasoning preservation, it also introduced severe regressions and rigid lockdowns that break local setups. This release brings full Qwen 3.8 support while fixing these official bugs:
+Qwen 3.8 introduces prompt-steered reasoning depth and new model architectures (`Qwen3.8-2.4T-A95B`, `Qwen3.8-27B`). While the official template added reasoning effort steering, it also introduced several lockdowns, regressions, and syntax crashes.
 
-1. **Prompt-Steered Reasoning Effort:** Qwen 3.8 introduces 3 core reasoning levels (`xhigh`, `medium`, `low`). The template injects official steering instructions when requested, and auto-suppresses them when thinking is turned off. Client API aliases (`high` / `max` for `xhigh`, `minimal` for `low`, and `none` for thinking off) are supported automatically for OpenAI and vLLM client compatibility.
-2. **Safe Default Reasoning Baseline (`medium`):** In official Qwen 3.8, `reasoning_effort` defaulted to `xhigh`. On complex tasks with finite token limits, this pushed the model to explore alternate branches until hitting `max_tokens`, returning zero content. We set the default to `medium` (zero injected tokens), preserving 100% prefix cache parity with v21.3 while eliminating empty-content failures.
-3. **Inline Chat Tags for Direct Effort Steering:** You can steer thinking depth directly inside chat prompts (for LM Studio, OpenCode, or WebUI) using inline tags:
-   * `<|think_low|>`: Enables thinking with concise reasoning instructions.
-   * `<|think_medium|>`: Enables thinking with standard baseline instructions.
-   * `<|think_xhigh|>`: Enables thinking with deep reasoning instructions.
-   * `<|think_off|>`: Turns off reasoning completely for fast responses.
-   *(All tags are automatically stripped from the rendered prompt, so the model never sees raw control tags)*.
-4. **Restored Fast Mode (No Reasoning):** Official 3.8 throws a fatal runtime exception if you pass `enable_thinking=false`. We removed this lockdown, giving you complete freedom to disable reasoning via kwargs or inline `<|think_off|>` tags.
-5. **Cured Official 3.8 Empty Think Bug:** Official 3.8 removed the in-content thinking parser. In multi-turn chats where reasoning is stored inside message content, official 3.8 injects a blank `<think></think>` block before the real thoughts. This template extracts reasoning cleanly without duplicating tags.
-6. **Universal Tool Arguments:** Official 3.8 crashes with `TypeError: Can only get item pairs from a mapping` when clients send standard OpenAI string arguments. This template handles both Python dictionaries and JSON strings seamlessly.
-7. **Native llama.cpp `--reasoning-preserve` Support:** Added native support for the new `llama.cpp` CLI flag via the `preserve_reasoning` alias.
-8. **Diagnostic Tooling:** Added `scripts/check_applied.py` to check whether `chat_template.jinja` or `tokenizer_config.json` is actively loaded by your runtime.
+The v22 generation delivers full Qwen 3.8 support with all official bugs resolved:
+
+| Feature / Fix | Official Qwen 3.8 Template | This Template (v22.2) |
+|---|---|---|
+| **Default Reasoning Baseline** | Hardcodes `xhigh` by default, often exhausting the token budget on reasoning before generating answers. | Defaults to `medium` (zero injected tokens), preserving KV cache parity with v21 and preventing empty-content timeouts. |
+| **Non-Reasoning Fast Mode** | Throws a fatal exception if `enable_thinking=false`. | Full non-reasoning mode restored via kwargs (`enable_thinking=false`, `reasoning_effort="none"`) or inline `<\|think_off\|>`. |
+| **History Reasoning Extraction** | Drops in-content thinking extraction, prepending blank `<think></think>` blocks to real thoughts in chat history. | Extracts reasoning across OpenAI (`reasoning_content`), Anthropic (`thinking`), and in-content tags (`<think>`) without tag duplication. |
+| **Tool Argument Wire Format** | Crashes on serialized JSON strings from standard OpenAI API clients. | Canonical XML default with universal argument handling: safely renders stringified JSON arguments in history without syntax crashes or KV cache invalidation. |
+| **Client Reasoning Aliases** | Rejects non-standard effort names. | Maps OpenAI, Claude Code, Cursor, and Cline aliases automatically: `high`, `max`, `ultracode`, `extreme` $\to$ `xhigh`; `minimal` $\to$ `low`; `none`, `off` $\to$ disabled. |
+| **Per-Turn Inline Chat Tags** | Not supported. | Inline steering via chat text: `<\|think_low\|>`, `<\|think_medium\|>`, `<\|think_xhigh\|>`, `<\|think_ultracode\|>`, `<\|think_off\|>`. Tags are stripped before inference. |
+| **Leading System Prompts** | Treats multiple leading system messages as separate turns. | Merges consecutive leading `system` and `developer` messages into a single system turn joined by double newlines. |
+| **Tool Error Recovery** | Not supported or triggers false warnings on search results containing words like "error". | Two-tier error recovery with smart code/grep disambiguation to avoid false warnings on search results like `throw new Error(...)`. |
+| **llama.cpp Flag Support** | Requires manual template kwargs. | Native alias support for `--reasoning-preserve` CLI flag via `preserve_reasoning`. |
+| **Diagnostic Tool** | None provided. | Includes `scripts/check_applied.py` to inspect model directories and GGUFs for active template versions. |
 
 ---
 
@@ -129,13 +130,13 @@ Qwen 3.8 has 3 native prompt-steered reasoning levels. You can control this via 
   > *"Reasoning effort is set to low. Keep your thinking brief and focused, moving directly to the conclusion without unnecessary elaboration."*
 
 *API Compatibility Aliases:*
-To prevent errors when calling the model through standard API proxies:
-* `"high"` and `"max"` automatically map to `"xhigh"` (standard OpenAI API clients send `"high"`).
-* `"minimal"` automatically maps to `"low"`.
-* `"none"` disables thinking entirely.
+To prevent errors when calling the model through standard API proxies and coding agent harnesses:
+* `"high"`, `"max"`, `"ultracode"`, and `"extreme"` automatically map to `"xhigh"` (supported by OpenAI, Claude Code, Cline, Cursor).
+* `"minimal"` and `"low"` automatically map to `"low"`.
+* `"none"` and `"off"` disable thinking entirely.
 
 **Via Inline Chat Tags (Per-Prompt Steering):**
-* `Solve this proof <|think_xhigh|>` (Deep reasoning)
+* `Solve this proof <|think_xhigh|>` or `<|think_ultracode|>` (Deep reasoning)
 * `Explain recursion briefly <|think_low|>` (Concise reasoning)
 * `What is the capital of France? <|think_off|>` (No reasoning / fast mode)
 
@@ -161,12 +162,14 @@ If you are on severely memory-constrained hardware and need to save context toke
 </details>
 
 <details>
-<summary><b>3. Tool Call Format Override (JSON vs XML)</b></summary>
+<summary><b>3. Tool Call Format (XML vs JSON)</b></summary>
 
-Qwen models are natively trained to output tool calls in XML (`<function=name>`). By default, this template uses native XML to maximize reliability.
+Qwen models are natively trained on XML tool calls (`<function=name>`). By default, this template uses **`xml`** format:
+* **`"xml"` (Default):** Generates canonical XML instructions for tool calls and safely handles both dictionary arguments and serialized JSON strings in assistant history without corrupting XML tags or mutating system prompts between turns.
+* **`"json"` (Optional Override):** Forces Hermes JSON format (`{"name": "...", "arguments": {...}}`) for both system prompt instructions and history rendering.
 
 **When to use the JSON override:**
-If you are using a framework or harness (such as specific Hermes Agent configurations) that strictly requires Hermes JSON (`{"name": "...", "arguments": {...}}`), pass:
+If you are using a framework or harness (such as specific Hermes Agent configurations) that strictly requires Hermes JSON, pass:
 ```json
 {
   "tool_call_format": "json"
@@ -200,7 +203,7 @@ python3 scripts/check_applied.py /path/to/your/model
 ```bash
 python3 scripts/test_v22.py
 ```
-Tests cover 34 automated verification cells including `reasoning_effort` levels, monotonic API mappings, inline chat tags, multi-part payloads, tool call serialization, dynamic truncation, error escalation, and multi-turn history parsing.
+Tests cover 44 automated verification cells including `reasoning_effort` levels, monotonic API mappings, inline chat tags, multi-part payloads, tool call serialization, dynamic truncation, error escalation, multi-turn history parsing, and KV cache stability.
 
 </details>
 
@@ -262,6 +265,14 @@ When thinking is disabled, Qwen models often hallucinate reasoning tags due to t
 
 <details>
 <summary>Update History & Changelog</summary>
+
+> **2026-08-19 Update (v22.2): Extended Effort Aliases, String Argument Safety, and Error Disambiguation.**
+> 1. **Universal Tool Argument Handling:** Hardened XML tool argument parsing to safely handle both mappings and serialized JSON strings in assistant history without syntax crashes or KV cache mutation.
+> 2. **Reasoning Effort Aliases:** Added `"ultracode"` and `"extreme"` mappings to `'xhigh'`, with inline `<|think_ultracode|>` and `<|think_extreme|>` support (#78).
+> 3. **Multi-System Message Merging:** Merged consecutive leading `system` and `developer` messages into a single unified system turn with `\n\n`.
+> 4. **Grep / Search Error Disambiguation:** Eliminated false-positive tool error warnings on code search results containing patterns like `throw new Error` or `console.error` (#66).
+> 5. **Safe XML Primitive Serialization:** Boolean and null XML parameter values now serialize to `true`, `false`, and `null` via `| tojson`.
+> 6. **Zero-Crash Resilience:** Maintained full resilience without fatal `raise_exception` aborts across all runtime engines.
 
 > **2026-08-16 Update (v22.1): The Qwen 3.8 Update (Bounded Reasoning Defaults, Inline Chat Tags, and Diagnostic Utility).**
 > 1. **Full Qwen 3.8 Support:** Single drop-in template covering all Qwen 3.5, 3.6, and 3.8 model variants (`Qwen3.8-2.4T-A95B`, `Qwen3.8-27B`).
