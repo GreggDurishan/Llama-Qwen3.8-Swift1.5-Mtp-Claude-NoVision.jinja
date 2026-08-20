@@ -54,7 +54,7 @@ llama-server -m your_model.gguf --jinja --chat-template-file chat_template.jinja
 ```
 *Why `--reasoning-format deepseek` matters:* When connecting coding agents like OpenCode, Claude Code, or Pi.dev to `llama-server`, this flag extracts `<think>` blocks into the dedicated `reasoning_content` API response field. This prevents raw thinking tokens from leaking into the text stream and stopping tool calls midway.
 
-*Native CLI flag:* On recent `llama.cpp` builds, you can pass `--reasoning-preserve` directly to ensure 100% Prefix KV Cache retention.
+*Native CLI flag:* On recent `llama.cpp` builds, you can pass `--reasoning-preserve` directly for 100% Prefix KV Cache retention.
 
 ### LM Studio
 1. Open your Qwen model in the right side panel.
@@ -87,7 +87,7 @@ The official Qwen templates contain engine restrictions, Python-specific Jinja l
 |---|---|---|
 | **Qwen 3.8 Support** | Official 3.8 crashes if `enable_thinking=false`. | **Restored Fast Mode**. Supports fast non-reasoning mode via kwargs or `<\|think_off\|>`. |
 | **Qwen 3.8 Token Safety** | Official `xhigh` default burns token budgets with zero content returned. | **Safe `medium` Default**. Zero prompt injection unless explicitly requested. |
-| **Qwen 3.8 Regression** | Official 3.8 injects duplicate blank `<think></think>` in chat history. | **Cured Empty Think Poisoning**. Robust multi-format reasoning extraction. |
+| **Qwen 3.8 Regression** | Official 3.8 injects duplicate blank `<think></think>` in chat history. | **Cured Empty Think Poisoning**. Multi-format reasoning extraction. |
 | **Reasoning Control** | Inability to change reasoning effort in chat interfaces. | **Inline Chat Tags**. Full support for `<\|think_low\|>`, `<\|think_medium\|>`, and `<\|think_xhigh\|>`. |
 | **Compatibility** | `llama.cpp --reasoning-preserve` CLI flag compatibility. | **Native Alias Support**. Supports both `preserve_reasoning` and `preserve_thinking`. |
 | **Compatibility** | JSON-string tool arguments (OpenAI / Ollama) crash official templates. | **Universal Tool Parsing**. Safely handles mappings, JSON strings, and scalar args. |
@@ -232,7 +232,7 @@ Apache-2.0, inherited from Qwen.
 Previous templates attempted to save tokens by replacing past thoughts with empty `<think>\n</think>` blocks, combined with an absolute system prompt demanding a tool be called immediately after `</think>`. This created a toxic pattern where the model associated empty thoughts with tools, causing an 80%+ premature turn abort rate. We abolished empty think injection and rewrote the `<IMPORTANT>` directives to explicitly authorize conversational synthesis after thinking. In this release, we also cured official Qwen 3.8's history bug where missing in-content parsers created duplicate blank think tags.
 
 ### 2. Upfront Pre-Scan for Control Tags & Inline Effort Steering
-In Jinja templates, system prompts are assembled before iterating over message history. We introduce a comprehensive upfront pre-scan covering raw strings, string lists, and multi-part content lists (`[{'type': 'text', 'text': '...'}]`). This resolves `<|think_off|>`, `<|think_on|>`, `<|think_low|>`, `<|think_medium|>`, and `<|think_xhigh|>` states before the system message is built, ensuring reasoning instructions are never injected into non-reasoning turns and all tags are cleanly stripped during rendering.
+In Jinja templates, system prompts are assembled before iterating over message history. We introduce an upfront pre-scan covering raw strings, string lists, and multi-part content lists (`[{'type': 'text', 'text': '...'}]`). This resolves `<|think_off|>`, `<|think_on|>`, `<|think_low|>`, `<|think_medium|>`, and `<|think_xhigh|>` states before the system message is built, preventing reasoning instructions from being injected into non-reasoning turns and cleanly stripping all tags during rendering.
 
 ### 3. KV Cache Safety and Autoregressive Normalization
 Llama.cpp and vLLM utilize prefix KV caching to speed up generation. Because this template preserves historical thoughts chronologically by default and defaults `reasoning_effort` to `medium` (zero system tokens), rendered history perfectly synchronizes with cached generated tokens. Combined with strict single newline normalization at autoregressive boundaries, this achieves a 100% KV Cache hit rate in multi-turn sessions.
@@ -284,6 +284,8 @@ When thinking is disabled, Qwen models often hallucinate reasoning tags due to t
 > 7. **Test Suite Expansion (44 -> 101):** Added coverage for control tag and alias completeness, malformed input and exception paths, vision payloads, agentic wire-format shapes, reasoning extraction variants, error detection precision, prefix KV cache stability, and jinja/oneline build parity.
 > 8. **Property-Based Fuzz Harness:** Added `scripts/fuzz_template.py`, a deterministic conversation generator asserting nine structural invariants (render success, jinja/oneline parity, token balance, verbatim content preservation, XML parameter fidelity, JSON tool-call validity, warning precision, prefix KV stability, no-think prefill). Prefix stability is checked at generation boundaries: merged system blocks and consecutive tool-result batches are atomic, since the model only generates after a full batch is appended.
 >
+> *(Credits: Huge thanks to Juan Calderon-Perez (@g-a-b-y) for their massive contributions to the v22.3 release, including the property-based fuzz harness, the two-tier error signal architecture, and extensive test coverage!)*
+>
 > **2026-08-19 Update (v22.2): Extended Effort Aliases, String Argument Safety, and Error Disambiguation.**
 > 1. **Universal Tool Argument Handling:** Hardened XML tool argument parsing to safely handle both mappings and serialized JSON strings in assistant history without syntax crashes or KV cache mutation.
 > 2. **Reasoning Effort Aliases:** Added `"ultracode"` and `"extreme"` mappings to `'xhigh'`, with inline `<|think_ultracode|>` and `<|think_extreme|>` support (#78).
@@ -297,7 +299,7 @@ When thinking is disabled, Qwen models often hallucinate reasoning tags due to t
 > 2. **Default `reasoning_effort` to `medium`:** Replaced the unsafe `xhigh` default with `medium` (zero injected tokens). Eliminates the runaway reasoning token-burn failure where models explore branches until hitting `max_tokens` with empty content (#72).
 > 3. **Inline Chat Tags:** Added support for `<|think_low|>`, `<|think_medium|>`, and `<|think_xhigh|>` tags directly inside chat messages (#70).
 > 4. **API Mapping & Aliasing:** Added case-insensitive alias support for client and serving runtimes (`high`/`max` -> `xhigh`, `minimal` -> `low`, `none` -> thinking off).
-> 5. **Sequential Control Tag Stripping:** Ensured all 7 control tags are cleanly stripped across system, user, and multi-part content without prompt leakage.
+> 5. **Sequential Control Tag Stripping:** All 7 control tags are cleanly stripped across system, user, and multi-part content without prompt leakage.
 > 6. **Cured Official 3.8 Empty Think Bug:** Fixed a regression in the official Qwen 3.8 template where removing `<think>` extraction caused blank `<think></think>` blocks to be prepended to real thoughts in chat history.
 > 7. **Restored Fast Mode:** Replaced official 3.8's hard exception on `enable_thinking=false`, restoring full user freedom to disable reasoning via kwargs or `<|think_off|>`.
 > 8. **Universal Tool Arguments:** Hardened tool call parsing to handle both dictionary structures and JSON-serialized strings without crashing.

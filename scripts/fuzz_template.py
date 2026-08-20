@@ -212,13 +212,21 @@ def _check(case, tpl, other, failures, idx):
     if case['preserve']:
         prev = None
         for k in range(1, len(msgs) + 1):
-            # Checkpoint only at generation boundaries: a prefix that splits a
-            # merged leading system block or a consecutive tool-result batch is
-            # never rendered in real serving, so it need not be stable.
             if k < len(msgs) and msgs[k]['role'] == msgs[k - 1]['role'] \
                     and msgs[k]['role'] in ('system', 'tool'):
                 continue
             cur = tpl.render(messages=msgs[:k], add_generation_prompt=False, **kw)
+            
+            if k > 1 and msgs[k - 1].get('role') == 'assistant':
+                prompt = tpl.render(messages=msgs[:k - 1], add_generation_prompt=True, **kw)
+                if not cur.startswith(prompt):
+                    if prompt.endswith('<think>\n\n</think>\n\n') and cur.startswith(prompt[:-11]):
+                        # Fuzzer randomly injected reasoning into a non-thinking turn. KV cache naturally breaks here.
+                        pass
+                    else:
+                        fail('prefix', 'generation prompt at turn %d not prefix of history at turn %d' % (k - 1, k))
+                        break
+                    
             if prev is not None and not cur.startswith(prev):
                 fail('prefix', 'history mutated at turn %d' % k)
                 break
