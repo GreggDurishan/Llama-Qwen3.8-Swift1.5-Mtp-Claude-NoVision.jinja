@@ -15,7 +15,7 @@ tags:
   - thinking
 ---
 
-# Fixed jinja chat templates for Qwen 3.5, 3.6 & 3.8 (v22.2)
+# Fixed jinja chat templates for Qwen 3.5, 3.6 & 3.8 (v22.3)
 
 This is a universal drop-in Jinja template that fixes rendering errors, KV cache invalidation, token waste, empty think poisoning, and fatal agentic stalling across official Qwen chat templates.
 
@@ -23,13 +23,13 @@ It works across LM Studio, llama.cpp, vLLM, MLX, oMLX, KoboldCPP, and any engine
 
 ---
 
-## What is New with Qwen 3.8 (v22 / v22.1 / v22.2)
+## What is New with Qwen 3.8 (v22 / v22.1 / v22.2 / v22.3)
 
 Qwen 3.8 introduces prompt-steered reasoning depth and new model architectures (`Qwen3.8-2.4T-A95B`, `Qwen3.8-27B`). While the official template added reasoning effort steering, it also introduced several lockdowns, regressions, and syntax crashes.
 
 The v22 generation delivers full Qwen 3.8 support with all official bugs resolved:
 
-| Feature / Fix | Official Qwen 3.8 Template | This Template (v22.2) |
+| Feature / Fix | Official Qwen 3.8 Template | This Template (v22.3) |
 |---|---|---|
 | **Default Reasoning Baseline** | Hardcodes `xhigh` by default, often exhausting the token budget on reasoning before generating answers. | Defaults to `medium` (zero injected tokens), preserving KV cache parity with v21 and preventing empty-content timeouts. |
 | **Non-Reasoning Fast Mode** | Throws a fatal exception if `enable_thinking=false`. | Full non-reasoning mode restored via kwargs (`enable_thinking=false`, `reasoning_effort="none"`) or inline `<\|think_off\|>`. |
@@ -38,7 +38,7 @@ The v22 generation delivers full Qwen 3.8 support with all official bugs resolve
 | **Client Reasoning Aliases** | Rejects non-standard effort names. | Maps OpenAI, Claude Code, Cursor, and Cline aliases automatically: `high`, `max`, `ultracode`, `extreme` $\to$ `xhigh`; `minimal` $\to$ `low`; `none`, `off` $\to$ disabled. |
 | **Per-Turn Inline Chat Tags** | Not supported. | Inline steering via chat text: `<\|think_low\|>`, `<\|think_medium\|>`, `<\|think_xhigh\|>`, `<\|think_ultracode\|>`, `<\|think_off\|>`. Tags are stripped before inference. |
 | **Leading System Prompts** | Treats multiple leading system messages as separate turns. | Merges consecutive leading `system` and `developer` messages into a single system turn joined by double newlines. |
-| **Tool Error Recovery** | Not supported or triggers false warnings on search results containing words like "error". | Two-tier error recovery with smart code/grep disambiguation to avoid false warnings on search results like `throw new Error(...)`. |
+| **Tool Error Recovery** | Not supported or triggers false warnings on search results containing words like "error". | Two-tier error recovery with smart code/grep disambiguation to avoid false warnings on search results like `throw new Error(...)`. Structural signals escalate on payloads of any size. |
 | **llama.cpp Flag Support** | Requires manual template kwargs. | Native alias support for `--reasoning-preserve` CLI flag via `preserve_reasoning`. |
 | **Diagnostic Tool** | None provided. | Includes `scripts/check_applied.py` to inspect model directories and GGUFs for active template versions. |
 
@@ -159,6 +159,8 @@ By default, this template **preserves** all past `<think>` blocks in the chat hi
 
 If you are on severely memory-constrained hardware and need to save context tokens, set `"preserve_thinking": false` (or `"preserve_reasoning": false`) to strip past thoughts.
 
+> **KV cache trade-off:** `preserve_thinking: false` keeps reasoning only for the turns that follow the most recent user query, so historical thoughts are dropped as soon as a new user turn begins. That rewrites already-rendered history and invalidates the prefix cache from the first assistant turn of the previous segment. The 100% Prefix KV Cache hit rate applies to the default (`true`) setting; enable stripping only when context pressure outweighs prompt reprocessing cost.
+
 </details>
 
 <details>
@@ -175,7 +177,7 @@ If you are using a framework or harness (such as specific Hermes Agent configura
   "tool_call_format": "json"
 }
 ```
-*(When opting into JSON format, argument truncation is safely bypassed to avoid corrupting JSON syntax)*.
+*(When opting into JSON format, both argument and tool response truncation are bypassed to avoid corrupting JSON syntax)*.
 
 </details>
 
@@ -183,8 +185,10 @@ If you are using a framework or harness (such as specific Hermes Agent configura
 <summary><b>4. Dynamic Payload Truncation</b></summary>
 
 To prevent oversized tool returns from blowing out context limits:
-* `max_tool_arg_chars` (default `0` / disabled): Slices oversized tool call arguments.
+* `max_tool_arg_chars` (default `0` / disabled): Slices oversized tool call arguments. Applies to mapping arguments and to serialized JSON string arguments alike.
 * `max_tool_response_chars` (default `0` / disabled): Slices oversized tool output data.
+
+Both limiters are disabled automatically when `tool_call_format="json"` is active, since slicing serialized JSON corrupts the payload for downstream parsers.
 
 </details>
 
@@ -203,7 +207,7 @@ python3 scripts/check_applied.py /path/to/your/model
 ```bash
 python3 scripts/test_v22.py
 ```
-Tests cover 44 automated verification cells including `reasoning_effort` levels, monotonic API mappings, inline chat tags, multi-part payloads, tool call serialization, dynamic truncation, error escalation, multi-turn history parsing, and KV cache stability.
+Tests cover 101 automated verification cells including `reasoning_effort` levels, monotonic API mappings, inline chat tags, multi-part and vision payloads, tool call serialization across wire formats, dynamic truncation, error escalation precision, malformed input handling, multi-turn history parsing, prefix KV cache stability, and parity between `chat_template.jinja` and `chat_template_oneline.txt`. Set `QWEN_TEMPLATE_FILE=chat_template_oneline.txt` to run the entire suite against the minified build. Test 101 is a deterministic property fuzzer (`scripts/fuzz_template.py`) asserting nine structural invariants over generated conversations; run it standalone with `python3 scripts/fuzz_template.py --cases 2000`.
 
 </details>
 
@@ -240,12 +244,16 @@ The model was trained with the XML tool format used by Qwen3-Coder. We restored 
 When a tool call fails validation repeatedly, the model can enter a degenerate reasoning spiral. This template leverages a two-tier escalation system driven by a forward-tracked `consecutive_failures` counter. On the first error, a diagnostic warning is injected. On the second consecutive error, an urgent system warning forces a fundamentally different approach while retaining the reasoning block so the model can plan its correction.
 
 ### 6. Smart False-Positive Detection
-Instead of broad substring matching that triggers false retry loops on successful database returns containing words like "error", this template utilizes strict structural guards looking for `Exception:`, `"error":`, `Traceback`, and `command not found`, combined with length gates and shell echo exclusions (`$ `).
+Instead of broad substring matching that triggers false retry loops on successful database returns containing words like "error", this template utilizes strict structural guards evaluated over the first 120 characters of the payload.
+
+Signals are split into two tiers. **Strong signals** are unambiguous structural markers (`"error":`, `Traceback (most recent call last):`, `command not found`, `Exception:`, `fatal:`, nonzero exit codes, `invalid syntax`) and fire unconditionally. **Weak signals** are bare prefixes (`error:`, `err!`) and remain gated by a length ceiling plus shell echo (`$ `) and timing (`took `) exclusions. Code and search results are excluded up front via `throw new`, `console.error`, `logger.error` and similar patterns.
+
+Tiering matters because the earlier flat gate suppressed every signal on payloads of 600 characters or more: a routine multi-frame Python traceback exceeds that ceiling, and any output echoing a shell prompt or a timing figure was discarded outright. Strong signals now escalate regardless of payload size.
 
 ### 7. minijinja Compatibility Constraints
 Python-only Jinja2 features crash or misbehave on `minijinja` (the C++ runtime used by llama.cpp, LM Studio, and MLX). All instances have been refactored for universal support:
 * `content | replace('<|think_on|>', '')` became `content.split('<|think_on|>') | join('')` (fixes a bug where `minja` silently drops the entire text payload if the replaced string is found at index 0).
-* `| items` became `for key in mapping`.
+* `| items` became `mapping.items()` iteration, which `minijinja` implements natively.
 * `loop.previtem` became explicit array indexing.
 * `map('string')` became `join('|')`.
 * `| first` became `'$ ' in content`.
@@ -254,7 +262,7 @@ Python-only Jinja2 features crash or misbehave on `minijinja` (the C++ runtime u
 Deeply nested Jinja loops and macros create severe parsing bottlenecks in C++ inference engines. We flattened the AST architecture, effectively curing an 80% inference throughput drop on `llama.cpp` by streamlining how `ns_state` tracking and historical rendering loops are evaluated.
 
 ### 9. Dynamic Payload Truncation
-Massive API or database returns can instantly blow out a model's context window. We implemented `max_tool_arg_chars` and `max_tool_response_chars` limiters that safely slice oversized payloads. Crucially, this truncation is automatically disabled when `tool_call_format="json"` is active, as slicing a serialized JSON string structurally corrupts the data and crashes downstream parsers.
+Massive API or database returns can instantly blow out a model's context window. We implemented `max_tool_arg_chars` and `max_tool_response_chars` limiters that safely slice oversized payloads. Argument truncation covers both mapping arguments and serialized JSON string arguments, so the OpenAI proxy wire format is limited on the same terms as native dictionaries. Both limiters are automatically disabled when `tool_call_format="json"` is active, as slicing serialized JSON structurally corrupts the data and crashes downstream parsers.
 
 ### 10. Reasoning Bypass Hallucination Mitigation
 When thinking is disabled, Qwen models often hallucinate reasoning tags due to their training bias. We injected a safe boundary and adjusted the `<IMPORTANT>` system block to remove explicit mentions of `</think>` during tool instructions. This stops the model from hallucinating closing tags when calling tools in a no-reasoning state.
@@ -266,6 +274,16 @@ When thinking is disabled, Qwen models often hallucinate reasoning tags due to t
 <details>
 <summary>Update History & Changelog</summary>
 
+> **2026-08-20 Update (v22.3): Error Detection Tiering, Reasoning De-duplication, and Test Suite Expansion.**
+> 1. **Two-Tier Error Signals:** Structural error markers now escalate regardless of payload size. The previous flat 600-character ceiling plus whole-body `$ ` and `took ` exclusions silently suppressed warnings on ordinary multi-frame tracebacks and on any shell transcript that echoed its command. Successful exit-code reports (`Exit code: 0`) and JSON success envelopes (`"error": null` / `false` / `""`) are excluded from the strong tier so success payloads do not escalate.
+> 2. **Reasoning De-duplication:** When `reasoning_content` or `thinking` is supplied, a leading think block in `content` is stripped so clients that populate both no longer emit two consecutive think blocks. Literal tags later in the answer (for example inside code fences) are preserved verbatim; full heuristic extraction still applies when no explicit reasoning field is present.
+> 3. **Single-Line Think Blocks:** `<think>...</think>` written without surrounding newlines is now extracted instead of leaking raw tags into rendered history.
+> 4. **Complete Argument Serialization:** Scalar and list tool arguments are serialized via `| tojson` rather than silently dropped, in both XML and JSON wire formats.
+> 5. **Consistent Truncation:** `max_tool_arg_chars` now applies to serialized JSON string arguments, and `max_tool_response_chars` is bypassed under `tool_call_format="json"` as documented.
+> 6. **KV Cache Documentation:** Documented that `preserve_thinking: false` rewrites rendered history at each new user turn and therefore voids the prefix cache guarantee, which applies to the default setting.
+> 7. **Test Suite Expansion (44 -> 101):** Added coverage for control tag and alias completeness, malformed input and exception paths, vision payloads, agentic wire-format shapes, reasoning extraction variants, error detection precision, prefix KV cache stability, and jinja/oneline build parity.
+> 8. **Property-Based Fuzz Harness:** Added `scripts/fuzz_template.py`, a deterministic conversation generator asserting nine structural invariants (render success, jinja/oneline parity, token balance, verbatim content preservation, XML parameter fidelity, JSON tool-call validity, warning precision, prefix KV stability, no-think prefill). Prefix stability is checked at generation boundaries: merged system blocks and consecutive tool-result batches are atomic, since the model only generates after a full batch is appended.
+>
 > **2026-08-19 Update (v22.2): Extended Effort Aliases, String Argument Safety, and Error Disambiguation.**
 > 1. **Universal Tool Argument Handling:** Hardened XML tool argument parsing to safely handle both mappings and serialized JSON strings in assistant history without syntax crashes or KV cache mutation.
 > 2. **Reasoning Effort Aliases:** Added `"ultracode"` and `"extreme"` mappings to `'xhigh'`, with inline `<|think_ultracode|>` and `<|think_extreme|>` support (#78).
