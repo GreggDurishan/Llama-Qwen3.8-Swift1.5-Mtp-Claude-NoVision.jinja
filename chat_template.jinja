@@ -1,4 +1,4 @@
-{%- set template_version = "qwen3.8-froggeric-v22.2" %}
+{%- set template_version = "qwen3.8-froggeric-v22.3" %}
 {%- set _tool_format = tool_call_format if tool_call_format is defined else 'xml' %}
 {%- set image_count = namespace(value=0) %}
 {%- set video_count = namespace(value=0) %}
@@ -233,18 +233,35 @@
         {{- '<|im_start|>user\n' + content + '<|im_end|>\n' }}
     {%- elif message.role == 'assistant' %}
         {%- set reasoning_content = '' %}
+        {%- set _explicit_reasoning = '' %}
         {%- if message.reasoning_content is defined and message.reasoning_content is not none %}
             {%- if message.reasoning_content is string %}
-                {%- set reasoning_content = message.reasoning_content %}
+                {%- set _explicit_reasoning = message.reasoning_content %}
             {%- else %}
-                {%- set reasoning_content = message.reasoning_content | string %}
+                {%- set _explicit_reasoning = message.reasoning_content | string %}
             {%- endif %}
         {%- elif message.thinking is defined and message.thinking is not none %}
             {%- if message.thinking is string %}
-                {%- set reasoning_content = message.thinking %}
+                {%- set _explicit_reasoning = message.thinking %}
             {%- else %}
-                {%- set reasoning_content = message.thinking | string %}
+                {%- set _explicit_reasoning = message.thinking | string %}
             {%- endif %}
+        {%- endif %}
+        {%- if _explicit_reasoning %}
+            {%- set _lead_end = '' %}
+            {%- if content.startswith('<think>') and '</think>' in content %}
+                {%- set _lead_end = '</think>' %}
+            {%- elif content.startswith('<thinking>') and '</thinking>' in content %}
+                {%- set _lead_end = '</thinking>' %}
+            {%- elif content.startswith('</think>') %}
+                {%- set _lead_end = '</think>' %}
+            {%- elif content.startswith('</thinking>') %}
+                {%- set _lead_end = '</thinking>' %}
+            {%- endif %}
+            {%- if _lead_end %}
+                {%- set content = content.split(_lead_end)[-1].lstrip('\n') %}
+            {%- endif %}
+            {%- set reasoning_content = _explicit_reasoning %}
         {%- else %}
             {%- set _think_end = '' %}
             {%- if content.startswith('</think>') %}
@@ -259,6 +276,10 @@
                 {%- set _think_end = '\n</ think>' %}
             {%- elif '\n</think >' in content %}
                 {%- set _think_end = '\n</think >' %}
+            {%- elif content.startswith('<think>') and '</think>' in content %}
+                {%- set _think_end = '</think>' %}
+            {%- elif content.startswith('<thinking>') and '</thinking>' in content %}
+                {%- set _think_end = '</thinking>' %}
             {%- endif %}
             {%- if _think_end %}
                 {%- if 'thinking' in _think_end %}
@@ -295,8 +316,12 @@
                     {%- if tc.arguments is defined and tc.arguments is not none %}
                         {%- if tc.arguments is mapping %}
                             {%- set _args = tc.arguments | tojson %}
-                        {%- elif tc.arguments is string and tc.arguments %}
-                            {%- set _args = tc.arguments %}
+                        {%- elif tc.arguments is string %}
+                            {%- if tc.arguments %}
+                                {%- set _args = tc.arguments %}
+                            {%- endif %}
+                        {%- else %}
+                            {%- set _args = tc.arguments | tojson %}
                         {%- endif %}
                     {%- endif %}
                     {{- '<tool_call>\n{"name": ' }}{{- tc_name | tojson }}{{- ', "arguments": ' }}{{- _args }}{{- '}\n</tool_call>' }}
@@ -326,8 +351,19 @@
                                 {%- endif %}
                                 {{- '\n</parameter>\n' }}
                             {%- endfor %}
-                        {%- elif tc.arguments is string and tc.arguments %}
-                            {{- tc.arguments }}
+                        {%- else %}
+                            {%- if tc.arguments is string %}
+                                {%- set _raw_args = tc.arguments %}
+                            {%- else %}
+                                {%- set _raw_args = tc.arguments | tojson %}
+                            {%- endif %}
+                            {%- if _raw_args %}
+                                {%- if max_tool_arg_chars > 0 and _raw_args | length > max_tool_arg_chars %}
+                                    {{- _raw_args[:max_tool_arg_chars] + '\n[TRUNCATED - original length ' ~ (_raw_args | length | string) ~ ' chars]' }}
+                                {%- else %}
+                                    {{- _raw_args }}
+                                {%- endif %}
+                            {%- endif %}
                         {%- endif %}
                     {%- endif %}
                     {{- '</function>\n</tool_call>' }}
@@ -339,7 +375,12 @@
         {%- set _content_lower = content | lower %}
         {%- set _content_head = _content_lower[:120] %}
         {%- set _is_code_or_grep = ('throw new ' in _content_lower or 'throw error' in _content_lower or 'console.error' in _content_lower or 'logger.error' in _content_lower or 'logging.error' in _content_lower or 'import ' in _content_head or 'def ' in _content_head or 'function ' in _content_head) %}
-        {%- if not _is_code_or_grep and content | length < 600 and '$ ' not in content and 'took ' not in _content_lower and ('"error":' in _content_head or '"status": "error"' in _content_head or '"status":"error"' in _content_head or 'error:' in _content_head or 'err!' in _content_head or 'fatal:' in _content_head or 'traceback (most recent call last):' in _content_head or 'command not found' in _content_head or 'invalid syntax' in _content_head or _content_head.startswith('exception:') or _content_head.startswith('failed to ') or 'exit code: ' in _content_head or 'process exited with code' in _content_head) %}
+        {%- set _exit_code_zero = ('exit code: 0' in _content_head or 'process exited with code 0' in _content_head) %}
+        {%- set _error_field_ok = ('"error": null' in _content_head or '"error":null' in _content_head or '"error": false' in _content_head or '"error":false' in _content_head or '"error": ""' in _content_head or '"error":""' in _content_head) %}
+        {%- set _strong_error = (('"error":' in _content_head and not _error_field_ok) or '"status": "error"' in _content_head or '"status":"error"' in _content_head or 'traceback (most recent call last):' in _content_head or 'command not found' in _content_head or 'invalid syntax' in _content_head or 'fatal:' in _content_head or (('exit code: ' in _content_head or 'process exited with code' in _content_head) and not _exit_code_zero) or _content_head.startswith('exception:') or _content_head.startswith('failed to ')) %}
+        {%- set _weak_error = ('error:' in _content_head or 'err!' in _content_head) %}
+        {%- set _weak_suppressed = ('$ ' in _content_head or 'took ' in _content_head or content | length >= 600) %}
+        {%- if not _is_code_or_grep and (_strong_error or (_weak_error and not _weak_suppressed)) %}
             {%- set ns2.consecutive_failures = ns2.consecutive_failures + 1 %}
         {%- else %}
             {%- set ns2.consecutive_failures = 0 %}
@@ -347,7 +388,7 @@
         {%- if ns2.prev_role != 'tool' %}
             {{- '<|im_start|>user' }}
         {%- endif %}
-        {%- if max_tool_response_chars > 0 and content | length > max_tool_response_chars %}
+        {%- if _tool_format != 'json' and max_tool_response_chars > 0 and content | length > max_tool_response_chars %}
             {%- set content = content[:max_tool_response_chars] + '\n[TRUNCATED - original length ' ~ (content | length | string) ~ ' chars]' %}
         {%- endif %}
         {{- '\n<tool_response>\n' + content }}
