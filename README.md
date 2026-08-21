@@ -217,7 +217,8 @@ Tests cover 101 automated verification cells including `reasoning_effort` levels
 | Role | Author |
 |------|--------|
 | Original models | Alibaba Cloud (Qwen team) |
-| Template fixes | [froggeric](https://huggingface.co/froggeric) |
+| Template fixes | [Frédéric Guigand](https://huggingface.co/froggeric) (`@froggeric`) |
+| Property fuzzer, error tiering & test suite | [Juan Calderon-Perez](https://huggingface.co/g-a-b-y) (`@g-a-b-y`) |
 | C++ AST optimizations | [barubary](https://github.com/spiritbuun/buun-llama-cpp) / `spiritbuun` |
 
 ## License
