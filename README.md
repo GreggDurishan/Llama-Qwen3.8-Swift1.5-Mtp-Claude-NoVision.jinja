@@ -148,9 +148,9 @@ Tags are sticky: the template scans the whole conversation and the last tag foun
 
 **Editing defaults without kwargs (LM Studio and other UIs that cannot pass `chat_template_kwargs`):**
 Three variables near the top of `chat_template.jinja` hold the defaults. Edit them before pasting the template:
-* `_default_reasoning_effort = 'medium'` — effort used when no `reasoning_effort` kwarg is passed: `'low'`, `'medium'`, `'xhigh'`, or `'none'` (thinking off). The aliases listed above work too.
-* `enable_thinking = enable_thinking if enable_thinking is defined else true` — change `true` to `false` to default to non-thinking mode.
-* `_tool_format = tool_call_format if tool_call_format is defined else 'xml'` — change `'xml'` to `'json'` for harnesses that need Hermes JSON.
+* `_default_reasoning_effort = 'medium'` - effort used when no `reasoning_effort` kwarg is passed: `'low'`, `'medium'`, `'xhigh'`, or `'none'` (thinking off). The aliases listed above work too.
+* `enable_thinking = enable_thinking if enable_thinking is defined else true` - change `true` to `false` to default to non-thinking mode.
+* `_tool_format = tool_call_format if tool_call_format is defined else 'xml'` - change `'xml'` to `'json'` for harnesses that need Hermes JSON.
 
 </details>
 
