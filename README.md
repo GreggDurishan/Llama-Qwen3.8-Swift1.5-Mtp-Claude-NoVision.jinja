@@ -15,7 +15,7 @@ tags:
   - thinking
 ---
 
-# Fixed jinja chat templates for Qwen 3.5, 3.6 & 3.8 (v22.3)
+# Fixed jinja chat templates for Qwen 3.5, 3.6 & 3.8 (v22.4)
 
 This is a universal drop-in Jinja template that fixes rendering errors, KV cache invalidation, token waste, empty think poisoning, and fatal agentic stalling across official Qwen chat templates.
 
@@ -23,20 +23,20 @@ It works across LM Studio, llama.cpp, vLLM, MLX, oMLX, KoboldCPP, and any engine
 
 ---
 
-## What is New with Qwen 3.8 (v22 / v22.1 / v22.2 / v22.3)
+## What is New with Qwen 3.8 (v22 / v22.1 / v22.2 / v22.3 / v22.4)
 
 Qwen 3.8 introduces prompt-steered reasoning depth and new model architectures (`Qwen3.8-2.4T-A95B`, `Qwen3.8-27B`). While the official template added reasoning effort steering, it also introduced several lockdowns, regressions, and syntax crashes.
 
 The v22 generation delivers full Qwen 3.8 support with all official bugs resolved:
 
-| Feature / Fix | Official Qwen 3.8 Template | This Template (v22.3) |
+| Feature / Fix | Official Qwen 3.8 Template | This Template (v22.4) |
 |---|---|---|
 | **Default Reasoning Baseline** | Hardcodes `xhigh` by default, often exhausting the token budget on reasoning before generating answers. | Defaults to `medium` (zero injected tokens), preserving KV cache parity with v21 and preventing empty-content timeouts. |
-| **Non-Reasoning Fast Mode** | Throws a fatal exception if `enable_thinking=false`. | Full non-reasoning mode restored via kwargs (`enable_thinking=false`, `reasoning_effort="none"`) or inline `<\|think_off\|>`. |
+| **Non-Reasoning Fast Mode** | The `Qwen3.8-2.4T-A95B` template throws a fatal exception if `enable_thinking=false` (the `Qwen3.8-27B` template accepts it). | Full non-reasoning mode restored via kwargs (`enable_thinking=false`, `reasoning_effort="none"`) or inline `<\|think_off\|>`. |
 | **History Reasoning Extraction** | Drops in-content thinking extraction, prepending blank `<think></think>` blocks to real thoughts in chat history. | Extracts reasoning across OpenAI (`reasoning_content`), Anthropic (`thinking`), and in-content tags (`<think>`) without tag duplication. |
 | **Tool Argument Wire Format** | Crashes on serialized JSON strings from standard OpenAI API clients. | Canonical XML default with universal argument handling: safely renders stringified JSON arguments in history without syntax crashes or KV cache invalidation. |
 | **Client Reasoning Aliases** | Rejects non-standard effort names. | Maps OpenAI, Claude Code, Cursor, and Cline aliases automatically: `high`, `max`, `ultracode`, `extreme` $\to$ `xhigh`; `minimal` $\to$ `low`; `none`, `off` $\to$ disabled. |
-| **Per-Turn Inline Chat Tags** | Not supported. | Inline steering via chat text: `<\|think_low\|>`, `<\|think_medium\|>`, `<\|think_xhigh\|>`, `<\|think_ultracode\|>`, `<\|think_off\|>`. Tags are stripped before inference. |
+| **Inline Chat Tags** | Not supported. | Inline steering via chat text: `<\|think_low\|>`, `<\|think_medium\|>`, `<\|think_xhigh\|>`, `<\|think_ultracode\|>`, `<\|think_off\|>`. Tags are stripped before inference and stay in effect for later turns until another tag replaces them. |
 | **Leading System Prompts** | Treats multiple leading system messages as separate turns. | Merges consecutive leading `system` and `developer` messages into a single system turn joined by double newlines. |
 | **Tool Error Recovery** | Not supported or triggers false warnings on search results containing words like "error". | Two-tier error recovery with smart code/grep disambiguation to avoid false warnings on search results like `throw new Error(...)`. Structural signals escalate on payloads of any size. |
 | **llama.cpp Flag Support** | Requires manual template kwargs. | Native alias support for `--reasoning-preserve` CLI flag via `preserve_reasoning`. |
@@ -65,9 +65,11 @@ llama-server -m your_model.gguf --jinja --chat-template-file chat_template.jinja
 ### vLLM
 Replace the `"chat_template"` string in your `tokenizer_config.json` with `chat_template_oneline.txt` (or raw `chat_template.jinja`).
 ```bash
-vllm serve Qwen/Qwen3.8-2.4T-A95B --tool-call-parser qwen3_xml
+vllm serve Qwen/Qwen3.8-2.4T-A95B --reasoning-parser qwen3 --tool-call-parser qwen3_xml
 ```
-*Parser selection:* Use `--tool-call-parser qwen3_xml` on current vLLM releases. If you are on an older vLLM build, use `--tool-call-parser qwen3_coder`. If you explicitly set `tool_call_format="json"`, use `--tool-call-parser hermes`.
+*Reasoning parser:* Use `--reasoning-parser qwen3` on vLLM to split `<think>` blocks into the response reasoning field. Note that vLLM's parser checks the top-level `enable_thinking: false` request parameter or `reasoning_effort: "none"`, but does not inspect Jinja-internal dynamic `<|think_off|>` tags in prompt bodies. To disable reasoning on vLLM, pass `"enable_thinking": false` in your request parameters.
+
+*Tool parser selection:* Use `--tool-call-parser qwen3_xml` on current vLLM releases. If you are on an older vLLM build, use `--tool-call-parser qwen3_coder`. If you explicitly set `tool_call_format="json"`, use `--tool-call-parser hermes`.
 
 ### oMLX / MLX
 Overwrite `chat_template.jinja` in your local model directory and launch with `--jinja`.
@@ -85,7 +87,7 @@ The official Qwen templates contain engine restrictions, Python-specific Jinja l
 
 | Area | Issue in Official Templates | The Fix |
 |---|---|---|
-| **Qwen 3.8 Support** | Official 3.8 crashes if `enable_thinking=false`. | **Restored Fast Mode**. Supports fast non-reasoning mode via kwargs or `<\|think_off\|>`. |
+| **Qwen 3.8 Support** | Official 3.8-2.4T-A95B crashes if `enable_thinking=false`. | **Restored Fast Mode**. Supports fast non-reasoning mode via kwargs or `<\|think_off\|>`. |
 | **Qwen 3.8 Token Safety** | Official `xhigh` default burns token budgets with zero content returned. | **Safe `medium` Default**. Zero prompt injection unless explicitly requested. |
 | **Qwen 3.8 Regression** | Official 3.8 injects duplicate blank `<think></think>` in chat history. | **Cured Empty Think Poisoning**. Multi-format reasoning extraction. |
 | **Reasoning Control** | Inability to change reasoning effort in chat interfaces. | **Inline Chat Tags**. Full support for `<\|think_low\|>`, `<\|think_medium\|>`, and `<\|think_xhigh\|>`. |
@@ -140,7 +142,15 @@ To prevent errors when calling the model through standard API proxies and coding
 * `Explain recursion briefly <|think_low|>` (Concise reasoning)
 * `What is the capital of France? <|think_off|>` (No reasoning / fast mode)
 
-*(Note: When thinking is disabled, reasoning effort instructions are automatically suppressed).*
+Tags are sticky: the template scans the whole conversation and the last tag found wins, so a tag in an earlier message stays in effect for later turns until another tag replaces it.
+
+*(Note: When thinking is disabled, reasoning effort instructions are automatically suppressed. On vLLM, prefer request-level `enable_thinking=false` or `reasoning_effort="none"` over `<|think_off|>`; see the vLLM setup notes above).*
+
+**Editing defaults without kwargs (LM Studio and other UIs that cannot pass `chat_template_kwargs`):**
+Three variables near the top of `chat_template.jinja` hold the defaults. Edit them before pasting the template:
+* `_default_reasoning_effort = 'medium'` — effort used when no `reasoning_effort` kwarg is passed: `'low'`, `'medium'`, `'xhigh'`, or `'none'` (thinking off). The aliases listed above work too.
+* `enable_thinking = enable_thinking if enable_thinking is defined else true` — change `true` to `false` to default to non-thinking mode.
+* `_tool_format = tool_call_format if tool_call_format is defined else 'xml'` — change `'xml'` to `'json'` for harnesses that need Hermes JSON.
 
 </details>
 
@@ -167,7 +177,7 @@ If you are on severely memory-constrained hardware and need to save context toke
 <summary><b>3. Tool Call Format (XML vs JSON)</b></summary>
 
 Qwen models are natively trained on XML tool calls (`<function=name>`). By default, this template uses **`xml`** format:
-* **`"xml"` (Default):** Generates canonical XML instructions for tool calls and safely handles both dictionary arguments and serialized JSON strings in assistant history without corrupting XML tags or mutating system prompts between turns.
+* **`"xml"` (Default):** Generates canonical XML instructions for tool calls and safely handles both dictionary arguments and serialized JSON strings in assistant history without corrupting XML tags or mutating system prompts between turns. Dictionary arguments render as `<parameter=...>` blocks; a serialized JSON string is rendered verbatim inside the `<function=...>` block as a best-effort fallback (Jinja cannot parse JSON), so dictionaries are preferred. vLLM converts string arguments to dictionaries before rendering, so it always takes the `<parameter>` path.
 * **`"json"` (Optional Override):** Forces Hermes JSON format (`{"name": "...", "arguments": {...}}`) for both system prompt instructions and history rendering.
 
 **When to use the JSON override:**
@@ -219,6 +229,7 @@ Tests cover 101 automated verification cells including `reasoning_effort` levels
 | Original models | Alibaba Cloud (Qwen team) |
 | Template fixes | [Frédéric Guigand](https://huggingface.co/froggeric) (`@froggeric`) |
 | Property fuzzer, error tiering & test suite | [Juan Calderon-Perez](https://huggingface.co/g-a-b-y) (`@g-a-b-y`) |
+| Multi-tool alignment, reasoning fields & docs | [Gabriel Devenyi](https://huggingface.co/gdevenyi) (`@gdevenyi`) |
 | C++ AST optimizations | [barubary](https://github.com/spiritbuun/buun-llama-cpp) / `spiritbuun` |
 
 ## License
@@ -275,6 +286,15 @@ When thinking is disabled, Qwen models often hallucinate reasoning tags due to t
 <details>
 <summary>Update History & Changelog</summary>
 
+> **2026-08-24 Update (v22.4): Multi-Tool Token Parity, Extended Reasoning Formats, and UI Default Knobs.**
+> 1. **Parallel Tool Call Token Parity:** Consecutive `<tool_call>` blocks in assistant history are now separated by a single newline (`\n`) instead of double newlines (`\n\n`), restoring exact token alignment with official Qwen model generation and preventing prefix KV cache divergence during multi-tool turns (#87).
+> 2. **vLLM & Responses API Reasoning Support:** Added native support for `message.reasoning` (used by vLLM OpenAI-compatible endpoints and Responses API schemas) alongside `reasoning_content` and `thinking` (#88).
+> 3. **Top-Level `_default_reasoning_effort` Knob:** Added an explicit `_default_reasoning_effort` configuration variable at the top of the template and removed dead assignment code, allowing LM Studio and WebUI users who cannot pass kwargs to change the default reasoning level cleanly without template errors (#91).
+> 4. **Documented Sticky Inline Tags & UI Configuration:** Documented inline tag persistence across turns, string-argument fallbacks in XML, and clarified vLLM launch commands (`--reasoning-parser qwen3` alongside `--tool-call-parser qwen3_xml`) (#89, #90).
+> 5. **Expanded Test Suite (101 -> 102):** Added automated test coverage for `message.reasoning` extraction, `_default_reasoning_effort` knob behavior, and updated parallel tool call assertions.
+>
+> *(Credits: Huge thanks to Gabriel Devenyi (@gdevenyi) for their contributions to the v22.4 release!)*
+>
 > **2026-08-20 Update (v22.3): Error Detection Tiering, Reasoning De-duplication, and Test Suite Expansion.**
 > 1. **Two-Tier Error Signals:** Structural error markers now escalate regardless of payload size. The previous flat 600-character ceiling plus whole-body `$ ` and `took ` exclusions silently suppressed warnings on ordinary multi-frame tracebacks and on any shell transcript that echoed its command. Successful exit-code reports (`Exit code: 0`) and JSON success envelopes (`"error": null` / `false` / `""`) are excluded from the strong tier so success payloads do not escalate.
 > 2. **Reasoning De-duplication:** When `reasoning_content` or `thinking` is supplied, a leading think block in `content` is stripped so clients that populate both no longer emit two consecutive think blocks. Literal tags later in the answer (for example inside code fences) are preserved verbatim; full heuristic extraction still applies when no explicit reasoning field is present.

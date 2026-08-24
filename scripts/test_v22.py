@@ -520,6 +520,41 @@ execute_test(
     ]
 )
 
+# 24b. OpenAI reasoning field (vLLM / Responses API name)
+execute_test(
+    "24b. OpenAI reasoning field (vLLM / Responses API name)",
+    messages=[
+        {"role": "user", "content": "Q1"},
+        {"role": "assistant", "content": "Answer 1", "reasoning": "Thought via reasoning field"},
+        {"role": "user", "content": "Q2"}
+    ],
+    expected_in=["<|im_start|>assistant\n<think>\nThought via reasoning field\n</think>\n\nAnswer 1<|im_end|>"]
+)
+
+# 24c. _default_reasoning_effort knob steers the no-kwarg default
+def run_default_effort_knob_test():
+    global tests_passed, tests_total
+    tests_total += 1
+    name = "24c. _default_reasoning_effort knob steers the no-kwarg default"
+    print(f"\n--- Running Test: {name} ---")
+    try:
+        src = open(os.path.join(TEMPLATE_DIR, TEMPLATE_FILE), encoding='utf-8').read()
+        assert src.count("_default_reasoning_effort = 'medium'") == 1, "knob line not found exactly once"
+        msgs = [{"role": "user", "content": "hi"}]
+        stock = env.from_string(src).render(messages=msgs, add_generation_prompt=True)
+        xhigh = env.from_string(src.replace("_default_reasoning_effort = 'medium'", "_default_reasoning_effort = 'xhigh'")).render(messages=msgs, add_generation_prompt=True)
+        off = env.from_string(src.replace("_default_reasoning_effort = 'medium'", "_default_reasoning_effort = 'none'")).render(messages=msgs, add_generation_prompt=True)
+        explicit = env.from_string(src.replace("_default_reasoning_effort = 'medium'", "_default_reasoning_effort = 'xhigh'")).render(messages=msgs, add_generation_prompt=True, reasoning_effort="low")
+        assert "Reasoning effort is set to" not in stock, "stock default must inject no steering line"
+        assert "Reasoning effort is set to xhigh" in xhigh, "xhigh knob must inject the xhigh line"
+        assert off.endswith("<think>\n\n</think>\n\n"), "none knob must disable thinking"
+        assert "Reasoning effort is set to low" in explicit, "an explicit kwarg must still override the knob"
+        print("✅ PASSED")
+        tests_passed += 1
+    except Exception as e:
+        print(f"❌ FAILED: {e}")
+run_default_effort_knob_test()
+
 # ==========================================
 # 4. Tool Calling (XML & JSON)
 # ==========================================
@@ -1152,7 +1187,7 @@ execute_test(
     ],
     expected_in=[
         "<|im_start|>assistant\n<think>\n\n</think>\n\n<tool_call>\n<function=f1>\n",
-        "</tool_call>\n\n<tool_call>\n<function=f2>\n"
+        "</tool_call>\n<tool_call>\n<function=f2>\n"
     ]
 )
 

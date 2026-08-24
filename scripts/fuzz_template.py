@@ -120,10 +120,13 @@ def _gen_case(rnd):
                     'tool_calls': calls}
             if rnd.random() < 0.5:
                 rz = _phrase(rnd)
-                if rnd.random() < 0.5:
+                r_pick = rnd.random()
+                if r_pick < 0.34:
                     amsg['content'] = '<think>\n' + rz + '\n</think>\n\n' + amsg['content']
-                else:
+                elif r_pick < 0.67:
                     amsg['reasoning_content'] = rz
+                else:
+                    amsg['reasoning'] = rz
                 if preserve:
                     reasonings.append(rz)
             msgs.append(amsg)
@@ -138,10 +141,13 @@ def _gen_case(rnd):
         amsg = {'role': 'assistant', 'content': ans}
         if rnd.random() < 0.6:
             rz = _phrase(rnd)
-            if rnd.random() < 0.5:
+            r_pick = rnd.random()
+            if r_pick < 0.34:
                 amsg['content'] = '<think>\n' + rz + '\n</think>\n\n' + ans
-            else:
+            elif r_pick < 0.67:
                 amsg['reasoning_content'] = rz
+            else:
+                amsg['reasoning'] = rz
             if preserve:
                 reasonings.append(rz)
         msgs.append(amsg)
