@@ -15,11 +15,11 @@ tags:
   - thinking
 ---
 
-# Fixed jinja chat templates for Qwen 3.5, 3.6 & 3.8 (v22.4)
+# Fixed jinja chat templates for Qwen 3.5, 3.6 & 3.8 (v22.5)
 
 This is a universal drop-in Jinja template that fixes rendering errors, KV cache invalidation, token waste, empty think poisoning, and fatal agentic stalling across official Qwen chat templates.
 
-It works across LM Studio, llama.cpp, vLLM, MLX, oMLX, KoboldCPP, and any engine that supports Hugging Face Jinja templates. You only need the single `chat_template.jinja` file at the root of this repository for all Qwen 3.5, 3.6, and 3.8 model sizes.
+It works across LM Studio, llama.cpp, vLLM, SGLang, MLX, oMLX, KoboldCPP, and any engine that supports Hugging Face Jinja templates. You only need the single `chat_template.jinja` file at the root of this repository for all Qwen 3.5, 3.6, 3.8, and 3.8 Flash-Next model sizes.
 
 ---
 
@@ -29,7 +29,7 @@ Qwen 3.8 introduces prompt-steered reasoning depth and new model architectures (
 
 The v22 generation delivers full Qwen 3.8 support with all official bugs resolved:
 
-| Feature / Fix | Official Qwen 3.8 Template | This Template (v22.4) |
+| Feature / Fix | Official Qwen 3.8 Template | This Template (v22.5) |
 |---|---|---|
 | **Default Reasoning Baseline** | Hardcodes `xhigh` by default, often exhausting the token budget on reasoning before generating answers. | Defaults to `medium` (zero injected tokens), preserving KV cache parity with v21 and preventing empty-content timeouts. |
 | **Non-Reasoning Fast Mode** | The `Qwen3.8-2.4T-A95B` template throws a fatal exception if `enable_thinking=false` (the `Qwen3.8-27B` template accepts it). | Full non-reasoning mode restored via kwargs (`enable_thinking=false`, `reasoning_effort="none"`) or inline `<\|think_off\|>`. |
@@ -71,8 +71,31 @@ vllm serve Qwen/Qwen3.8-2.4T-A95B --reasoning-parser qwen3 --tool-call-parser qw
 
 *Tool parser selection:* Use `--tool-call-parser qwen3_xml` on current vLLM releases. If you are on an older vLLM build, use `--tool-call-parser qwen3_coder`. If you explicitly set `tool_call_format="json"`, use `--tool-call-parser hermes`.
 
+### SGLang
+Launch SGLang with `--chat-template` pointing directly to `chat_template.jinja`:
+```bash
+python3 -m sglang.launch_server --model-path Qwen/Qwen3.8-27B --chat-template chat_template.jinja
+```
+*Why `--chat-template` matters on SGLang:* By default, SGLang 0.5.x ignores a local `chat_template.jinja` file in the model directory and falls back to the embedded template in `tokenizer_config.json`. Passing `--chat-template` (or using `chat-template: /path/to/chat_template.jinja` in YAML configuration) ensures the fixed template is loaded.
+
 ### oMLX / MLX
 Overwrite `chat_template.jinja` in your local model directory and launch with `--jinja`.
+
+### Recommended Sampling Parameters
+
+Official Qwen recommendations apply uniformly across all Qwen 3.x models (3.5, 3.6, 3.7, 3.8, and Flash-Next) based on mode and task:
+
+| Mode & Task | Temperature | Top-P | Top-K | Min-P | Presence Penalty | Description |
+|---|---|---|---|---|---|---|
+| **Thinking Mode — Coding & Agentic Tools** | **`0.6`** | `0.95` | `20` | `0.0` | `0.0` | **Recommended for coding & agents**: Sharpens syntax and tool argument fidelity while retaining exploratory reasoning. Presence penalty must stay at `0.0` to avoid penalizing necessary syntax keywords. |
+| **Thinking Mode — General Reasoning & Math** | **`1.0`** | `0.95` | `20` | `0.0` | `0.0` | **Recommended for general Q&A / math**: Encourages wide hypothesis exploration in `<think>` blocks. Avoid `temp: 0`, which can induce reasoning loops. |
+| **Non-Thinking / Instruct Mode (`enable_thinking: false`)** | **`0.7`** | `0.80` | `20` | `0.0` | `1.5` | Stable instruction following. For non-thinking coding tasks, lower temperature to `0.6` and set presence penalty to `0.0`. |
+
+* *Top-K:* Keeping `top_k: 20` is an official standard baseline across all Qwen models (especially quantized weights) to truncate long-tail token noise and prevent hallucinations.
+* *Min-P:* Official presets default to `min_p: 0.0`. On engines like `llama.cpp` or KoboldCPP, community users often use `min_p: 0.05` alongside `temp: 0.6` as a dynamic filter.
+
+### GitHub Copilot Desktop Canvas
+GitHub Copilot Desktop requires OpenAI-standard JSON tool calls. Launch your server with `tool_call_format="json"` and use `--tool-call-parser hermes` (e.g. on vLLM or llama-server) so Copilot can interact seamlessly with canvas tools.
 
 </details>
 
@@ -187,7 +210,7 @@ If you are using a framework or harness (such as specific Hermes Agent configura
   "tool_call_format": "json"
 }
 ```
-*(When opting into JSON format, both argument and tool response truncation are bypassed to avoid corrupting JSON syntax)*.
+*(When opting into JSON format, structured JSON responses and tool arguments are protected from truncation to preserve JSON syntax, while plain-text logs are safely sliced)*.
 
 </details>
 
@@ -198,7 +221,7 @@ To prevent oversized tool returns from blowing out context limits:
 * `max_tool_arg_chars` (default `0` / disabled): Slices oversized tool call arguments. Applies to mapping arguments and to serialized JSON string arguments alike.
 * `max_tool_response_chars` (default `0` / disabled): Slices oversized tool output data.
 
-Both limiters are disabled automatically when `tool_call_format="json"` is active, since slicing serialized JSON corrupts the payload for downstream parsers.
+In JSON mode (`tool_call_format="json"`), tool call arguments and structured JSON responses (`{...}`, `[...]`) are preserved intact to prevent syntax corruption, while long plain-text outputs (e.g. bash transcripts) remain safely governed by `max_tool_response_chars`.
 
 </details>
 
@@ -217,7 +240,7 @@ python3 scripts/check_applied.py /path/to/your/model
 ```bash
 python3 scripts/test_v22.py
 ```
-Tests cover 101 automated verification cells including `reasoning_effort` levels, monotonic API mappings, inline chat tags, multi-part and vision payloads, tool call serialization across wire formats, dynamic truncation, error escalation precision, malformed input handling, multi-turn history parsing, prefix KV cache stability, and parity between `chat_template.jinja` and `chat_template_oneline.txt`. Set `QWEN_TEMPLATE_FILE=chat_template_oneline.txt` to run the entire suite against the minified build. Test 101 is a deterministic property fuzzer (`scripts/fuzz_template.py`) asserting nine structural invariants over generated conversations; run it standalone with `python3 scripts/fuzz_template.py --cases 2000`.
+Tests cover 105 automated verification cells including `reasoning_effort` levels, monotonic API mappings, inline chat tags, multi-part and vision payloads, tool call serialization across wire formats, dynamic truncation, error escalation precision, malformed input handling, multi-turn history parsing, prefix KV cache stability, and parity between `chat_template.jinja` and `chat_template_oneline.txt`. Set `QWEN_TEMPLATE_FILE=chat_template_oneline.txt` to run the entire suite against the minified build. Test 105 is a deterministic property fuzzer (`scripts/fuzz_template.py`) asserting nine structural invariants over generated conversations; run it standalone with `python3 scripts/fuzz_template.py --cases 2000`.
 
 </details>
 
@@ -274,10 +297,10 @@ Python-only Jinja2 features crash or misbehave on `minijinja` (the C++ runtime u
 Deeply nested Jinja loops and macros create severe parsing bottlenecks in C++ inference engines. We flattened the AST architecture, effectively curing an 80% inference throughput drop on `llama.cpp` by streamlining how `ns_state` tracking and historical rendering loops are evaluated.
 
 ### 9. Dynamic Payload Truncation
-Massive API or database returns can instantly blow out a model's context window. We implemented `max_tool_arg_chars` and `max_tool_response_chars` limiters that safely slice oversized payloads. Argument truncation covers both mapping arguments and serialized JSON string arguments, so the OpenAI proxy wire format is limited on the same terms as native dictionaries. Both limiters are automatically disabled when `tool_call_format="json"` is active, as slicing serialized JSON structurally corrupts the data and crashes downstream parsers.
+Massive API or database returns can instantly blow out a model's context window. We implemented `max_tool_arg_chars` and `max_tool_response_chars` limiters that safely slice oversized payloads. Argument truncation covers both mapping arguments and serialized JSON string arguments, so the OpenAI proxy wire format is limited on the same terms as native dictionaries. In JSON mode (`tool_call_format="json"`), structured JSON payloads (`{...}`, `[...]`) and tool arguments are protected from truncation to guarantee JSON parse validity, while plain-text outputs (such as bash logs) are safely truncated according to `max_tool_response_chars`.
 
 ### 10. Reasoning Bypass Hallucination Mitigation
-When thinking is disabled, Qwen models often hallucinate reasoning tags due to their training bias. We injected a safe boundary and adjusted the `<IMPORTANT>` system block to remove explicit mentions of `</think>` during tool instructions. This stops the model from hallucinating closing tags when calling tools in a no-reasoning state.
+When thinking is disabled, Qwen models often hallucinate reasoning tags due to their training bias. In v22.5, we fully aligned the `# Tools` system prompt block: when thinking is disabled (`enable_thinking=false` or `reasoning_effort="none"`), the template omits `<think>` examples and planning directives entirely, instructing the model to output tool calls immediately without conversational prefixes. This prevents the model from attempting to reason or hallucinating closing tags after the prefilled closed `<think>\n\n</think>\n\n` block.
 
 </details>
 
@@ -286,6 +309,14 @@ When thinking is disabled, Qwen models often hallucinate reasoning tags due to t
 <details>
 <summary>Update History & Changelog</summary>
 
+> **2026-09-03 Update (v22.5): Non-Thinking Tool Prompt Alignment, Video URL Support, and Engine Hardening.**
+> 1. **Non-Thinking Tool Prompt Coherence:** When thinking is disabled (`enable_thinking=false` or `reasoning_effort="none"`), the `# Tools` system block now omits `<think>` examples and planning directives, perfectly aligning with the prefilled closed `<think>\n\n</think>\n\n` block and eliminating model stalling on non-reasoning agent loops (#94).
+> 2. **Multi-Part Video URL Detection:** Added `'video_url' in item` support in multi-part message parsing, mirroring `'image_url'` handling and eliminating unhandled exceptions on OpenAI-compatible multi-modal video payloads (#94).
+> 3. **Smart Response Truncation in JSON Mode:** Replaced the flat `_tool_format != 'json'` bypass with structural JSON detection (`[:1] in ('{', '['))`. Structured JSON tool payloads remain protected from mid-syntax slicing, while long plain-text terminal logs in JSON mode are safely truncated according to `max_tool_response_chars` (#94).
+> 4. **SGLang & Qwen 3.8 Flash-Next Support:** Added deployment documentation and verified compatibility for SGLang (`--chat-template`) and Qwen 3.8 Flash-Next (#101, #102).
+> 5. **Sampling Parameters & Harness Guidance:** Added recommended sampling parameters and GitHub Copilot Desktop Canvas configuration guidance (#86, #100).
+> 6. **Expanded Test Suite (102 -> 105):** Added automated regression tests for non-thinking tool prompt coherence, video URL parsing, and smart JSON response truncation.
+>
 > **2026-08-24 Update (v22.4): Multi-Tool Token Parity, Extended Reasoning Formats, and UI Default Knobs.**
 > 1. **Parallel Tool Call Token Parity:** Consecutive `<tool_call>` blocks in assistant history are now separated by a single newline (`\n`) instead of double newlines (`\n\n`), restoring exact token alignment with official Qwen model generation and preventing prefix KV cache divergence during multi-tool turns (#87).
 > 2. **vLLM & Responses API Reasoning Support:** Added native support for `message.reasoning` (used by vLLM OpenAI-compatible endpoints and Responses API schemas) alongside `reasoning_content` and `thinking` (#88).

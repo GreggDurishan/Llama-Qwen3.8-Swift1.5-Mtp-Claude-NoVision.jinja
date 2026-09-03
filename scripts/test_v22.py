@@ -1696,7 +1696,54 @@ execute_test(
 )
 
 # ==========================================
-# 14. Property-Based Fuzzing (v22.3)
+# 14. v22.5 Enhancements & Coherence Fixes
+# ==========================================
+
+# 102. Non-thinking tool prompt coherence (omits <think> block from instructions)
+execute_test(
+    "102. Non-thinking tool prompt coherence (omits <think> block from instructions)",
+    messages=[{"role": "user", "content": "Call weather tool"}],
+    tools=tools_sample,
+    kwargs={"enable_thinking": False},
+    expected_in=[
+        "If you choose to call a function ONLY reply in the following format with NO suffix:\n\n<tool_call>",
+        "If you choose to call a tool, you MUST output the <tool_call> block IMMEDIATELY, with NO conversational text before it."
+    ],
+    expected_not_in=[
+        "<think>\nBrief explanation of tool call\n</think>",
+        "You can use the <think></think> block to plan your next tool call",
+        "ALL explanation and reasoning MUST be placed strictly inside the <think></think> block"
+    ]
+)
+
+# 103. Multi-part video with 'video_url' dictionary format
+execute_test(
+    "103. Multi-part video with 'video_url' dictionary format",
+    messages=[{"role": "user", "content": [
+        {"type": "video_url", "video_url": {"url": "https://example.com/demo.mp4"}},
+        {"type": "text", "text": "summarize this video"}
+    ]}],
+    expected_in=[
+        "<|vision_start|><|video_pad|><|vision_end|>summarize this video"
+    ]
+)
+
+# 104. Plain-text tool response truncation in JSON mode
+execute_test(
+    "104. Plain-text tool response truncation in JSON mode",
+    messages=[
+        {"role": "user", "content": "Run bash"},
+        {"role": "assistant", "content": "", "tool_calls": [{"type": "function", "function": {"name": "bash", "arguments": {}}}]},
+        {"role": "tool", "content": "log line entry\n" * 100}
+    ],
+    kwargs={"tool_call_format": "json", "max_tool_response_chars": 50},
+    expected_in=[
+        "[TRUNCATED - original length"
+    ]
+)
+
+# ==========================================
+# 15. Property-Based Fuzzing (v22.3)
 # ==========================================
 
 def run_fuzz_property_test(name, cases, seed):
@@ -1725,9 +1772,9 @@ def execute_fuzz_property_test(*args, **kwargs):
     if run_fuzz_property_test(*args, **kwargs):
         tests_passed += 1
 
-# 101. Property fuzz: generated conversations uphold all structural invariants
+# 105. Property fuzz: generated conversations uphold all structural invariants
 execute_fuzz_property_test(
-    "101. Property fuzz: generated conversations uphold all structural invariants",
+    "105. Property fuzz: generated conversations uphold all structural invariants",
     cases=300,
     seed=20260820
 )
