@@ -83,16 +83,17 @@ Overwrite `chat_template.jinja` in your local model directory and launch with `-
 
 ### Recommended Sampling Parameters
 
-Official Qwen recommendations apply uniformly across all Qwen 3.x models (3.5, 3.6, 3.7, 3.8, and Flash-Next) based on mode and task:
+Official Qwen sampling recommendations differ between thinking mode and non-thinking mode, reflecting an architectural refinement introduced in Qwen 3.8:
 
-| Mode & Task | Temperature | Top-P | Top-K | Min-P | Presence Penalty | Description |
+| Model & Mode | Temperature | Top-P | Top-K | Min-P | Presence Penalty | Description |
 |---|---|---|---|---|---|---|
-| **Thinking Mode — Coding & Agentic Tools** | **`0.6`** | `0.95` | `20` | `0.0` | `0.0` | **Recommended for coding & agents**: Sharpens syntax and tool argument fidelity while retaining exploratory reasoning. Presence penalty must stay at `0.0` to avoid penalizing necessary syntax keywords. |
-| **Thinking Mode — General Reasoning & Math** | **`1.0`** | `0.95` | `20` | `0.0` | `0.0` | **Recommended for general Q&A / math**: Encourages wide hypothesis exploration in `<think>` blocks. Avoid `temp: 0`, which can induce reasoning loops. |
-| **Non-Thinking / Instruct Mode (`enable_thinking: false`)** | **`0.7`** | `0.80` | `20` | `0.0` | `1.5` | Stable instruction following. For non-thinking coding tasks, lower temperature to `0.6` and set presence penalty to `0.0`. |
+| **Qwen 3.8: Thinking Mode (All Tasks / Coding & General)** | **`1.0`** | `0.95` | `20` | `0.0` | `0.0` | **Official 3.8 default**: Prevents reasoning collapse in `<think>` blocks, allowing broad exploration and self-correction on coding (SWE-bench) and reasoning tasks. Presence penalty must stay at `0.0`. |
+| **Qwen 3.5 / 3.6: Thinking Mode (Precise Coding & WebDev)** | **`0.6`** | `0.95` | `20` | `0.0` | `0.0` | **Official 3.5/3.6 coding default**: Tailored for older checkpoints where lower temperature prevented logical drift during code synthesis. |
+| **All Models: Non-Thinking / Instruct Mode (`enable_thinking: false`)** | **`0.7`** | `0.80` | `20` | `0.0` | `1.5` | Stable direct instruction following when `enable_thinking=false` (or `<|think_off|>`). |
 
 * *Top-K:* Keeping `top_k: 20` is an official standard baseline across all Qwen models (especially quantized weights) to truncate long-tail token noise and prevent hallucinations.
 * *Min-P:* Official presets default to `min_p: 0.0`. On engines like `llama.cpp` or KoboldCPP, community users often use `min_p: 0.05` alongside `temp: 0.6` as a dynamic filter.
+* *Presence Penalty evolution:* In Qwen 3.5, the model card suggested `presence_penalty=1.5` for general thinking tasks, but set `0.0` for coding. Starting with Qwen 3.6 and 3.8, the official team standardized `presence_penalty=0.0` across all thinking modes because non-zero penalty during chain-of-thought causes language mixing and degrades code syntax. In non-thinking mode, `presence_penalty=1.5` remains officially recommended across all versions to prevent repetitive loops.
 
 ### GitHub Copilot Desktop Canvas
 GitHub Copilot Desktop requires OpenAI-standard JSON tool calls. Launch your server with `tool_call_format="json"` and use `--tool-call-parser hermes` (e.g. on vLLM or llama-server) so Copilot can interact seamlessly with canvas tools.
