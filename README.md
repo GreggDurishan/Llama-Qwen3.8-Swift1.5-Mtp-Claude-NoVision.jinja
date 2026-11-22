@@ -21,7 +21,7 @@ llama-server -m Swift-1.5-Qwen3.8-27B-GSQ-RCO-IQ3_XXS-mtp.gguf \
   --batch-size 1024 --ubatch-size 512 --fit-target 512
 ```
 
-> **VRAM Tip:** Disabling hardware/graphics acceleration in your browser (and terminal) keeps desktop DWM/browser surfaces from eating into your 16 GB discrete VRAM without needing to plug your monitor into motherboard graphics.
+> **VRAM Tip:** Disabling hardware/graphics acceleration in your browser (and terminal) keeps desktop DWM/browser surfaces from eating into discrete VRAM without needing to plug your monitor into motherboard graphics.
 
 ---
 
