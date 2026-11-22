@@ -1,4 +1,4 @@
-{%- set template_version = "Llama-Qwen3.8-Swift1.5-Mtp-Claude-NoVision-v1.0" %}
+{%- set template_version = "Llama-Qwen3.8-Swift1.5-Mtp-Claude-NoVision-v1.1" %}
 {%- set add_vision_id = add_vision_id if add_vision_id is defined else false %}
 {%- set enable_thinking = enable_thinking if enable_thinking is defined else true %}
 {%- set _preserve_thinking = preserve_thinking if (preserve_thinking is defined and preserve_thinking is not none) else (preserve_reasoning if (preserve_reasoning is defined and preserve_reasoning is not none) else false) %}
@@ -39,8 +39,7 @@
                 {%- set t = item.type | default('unknown') %}
                 {%- if t == 'text' and item.text is defined %}{{- item.text }}
                 {%- elif t == 'image' or 'image' in item or 'image_url' in item %}
-                    {%- if count_vision %}{%- set image_count.value = image_count.value + 1 %}{%- endif %}
-                    {{- ('Picture ' ~ image_count.value ~ ': ' if add_vision_id else '') ~ '<|vision_start|><|image_pad|><|vision_end|>' }}
+                    {{- '[Image omitted - NoVision template]' }}
                 {%- elif t == 'thinking' and (item.thinking is defined or item.text is defined) %}
                     {{- '<think>\n' ~ (item.thinking | default(item.text)) ~ '\n</think>' }}
                 {%- elif t == 'tool_reference' %}
@@ -48,7 +47,8 @@
                 {%- elif t in ('tool_use', 'server_tool_use', 'mcp_tool_use') %}
                     {{- '[Tool call: ' ~ (item.name | default(item.tool_name | default('unknown'))) ~ (' ' ~ (item.input | tojson) if item.input is defined else '') ~ ']' }}
                 {%- elif t in ('tool_result', 'web_search_tool_result', 'code_execution_tool_result') %}
-                    {{- '[Tool result]' ~ (' ' ~ render_content(item.content, count_vision) if item.content is defined else (' ' ~ item.text if item.text is defined else '')) }}
+                    {%- set _tr_body = (render_content(item.content, count_vision) if item.content is defined else (item.text if item.text is defined else '')) | trim %}
+                    {{- ('\n' if not loop.first else '') ~ '<tool_response>\n' ~ _tr_body ~ '\n</tool_response>' }}
                 {%- elif t == 'redacted_thinking' %}{{- '[Redacted thinking]' }}
                 {%- elif t == 'document' %}
                     {{- '[Document]' ~ (' ' ~ item.title if item.title is defined else '') ~ ('\n' ~ item.text if item.text is defined else '') }}
