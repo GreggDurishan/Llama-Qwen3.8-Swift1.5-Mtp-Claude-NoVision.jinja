@@ -14,8 +14,9 @@ Adapted from [froggeric/Qwen-Fixed-Chat-Templates](https://huggingface.co/frogge
 ```bash
 llama-server -m Swift-1.5-Qwen3.8-27B-GSQ-RCO-IQ3_XXS-mtp.gguf \
   --threads 6 --parallel 1 --load-mode none --flash-attn on \
-  --reasoning-effort medium --temp 0.7 --top-k 20 --top-p 0.95 --min-p 0.0 \
-  --spec-type draft-mtp --spec-draft-n-max 9 --spec-draft-p-min 0.72 \
+  --reasoning-format deepseek --reasoning-effort medium --temp 0.7 \
+  --top-k 20 --top-p 0.95 --min-p 0.0  --spec-type draft-mtp \
+  --spec-draft-n-max 9 --spec-draft-p-min 0.72 \
   --jinja --chat-template-file Llama-Qwen3.8-Swift1.5-Mtp-Claude-NoVision.jinja \
   --cache-type-k q5_0 --cache-type-v q4_1 \
   --batch-size 1024 --ubatch-size 512 --fit-target 512
@@ -40,3 +41,9 @@ llama-server -m Swift-1.5-Qwen3.8-27B-GSQ-RCO-IQ3_XXS-mtp.gguf \
 
 ### Refactored
 * **Unified `parse_and_strip()` Macro:** Consolidated repeated `<|think_*|>` tag detection and stripping blocks into a single reusable Jinja macro.
+
+## What's Changed in v1.1
+
+* **Native `<tool_response>` Wrapping for Anthropic Tool Results:** Renders `tool_result`, `web_search_tool_result`, and `code_execution_tool_result` blocks inside Qwen's native `<tool_response>...</tool_response>` tags (with newline separation between parallel tool results) so multi-step Claude Code tool loops preserve active `<think>` reasoning until the next user turn.
+* **Safe `NoVision` Image Placeholder:** Replaces `<|vision_start|><|image_pad|><|vision_end|>` special tokens with `[Image omitted - NoVision template]` so accidental image blocks in chat history don't trip up `llama-server` when running without `--mmproj`.
+
