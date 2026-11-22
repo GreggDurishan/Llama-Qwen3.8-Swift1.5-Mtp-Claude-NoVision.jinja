@@ -8,7 +8,8 @@ Adapted from [froggeric/Qwen-Fixed-Chat-Templates](https://huggingface.co/frogge
 
 ## Example Tuned `llama-server` Setup
 
-**Hardware:** Ryzen 5 9600X · 32 GB DDR5 · RX 9060 XT 16 GB  
+
+**Environment:** Ryzen 5 9600X · 32 GB DDR5 · RX 9060 XT 16 GB · Llama.cpp 1.0 (Windows x64 Vulkan)  
 **Performance:** ~136k context · 300–800 t/s prompt processing · 15–40 t/s generation (with MTP speculative decoding)
 
 ```bash
