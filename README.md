@@ -13,13 +13,12 @@ Adapted from [froggeric/Qwen-Fixed-Chat-Templates](https://huggingface.co/frogge
 
 ```bash
 llama-server -m Swift-1.5-Qwen3.8-27B-GSQ-RCO-IQ3_XXS-mtp.gguf \
-  --threads 6 --parallel 1 --load-mode none --flash-attn on \
-  --reasoning-format deepseek --reasoning-effort medium --temp 0.7 \
-  --top-k 20 --top-p 0.95 --min-p 0.0  --spec-type draft-mtp \
-  --spec-draft-n-max 9 --spec-draft-p-min 0.72 \
-  --jinja --chat-template-file Llama-Qwen3.8-Swift1.5-Mtp-Claude-NoVision.jinja \
-  --cache-type-k q5_0 --cache-type-v q4_1 \
-  --batch-size 1024 --ubatch-size 512 --fit-target 512
+  --threads 6 --parallel 1 --load-mode none --fit-target 512 \
+  --flash-attn on --reasoning-format deepseek --reasoning-effort medium \
+  --temp 0.7 --top-k 20 --top-p 0.95 --min-p 0.0 \
+  --cache-type-k q5_0 --cache-type-v q4_1 --batch-size 1024 --ubatch-size 512 \
+  --spec-type draft-mtp --spec-draft-n-max 9 --spec-draft-p-min 0.72 \
+  --jinja --chat-template-file Llama-Qwen3.8-Swift1.5-Mtp-Claude-NoVision.jinja
 ```
 
 > **VRAM Tip:** Disabling hardware/graphics acceleration in your browser (and terminal) keeps desktop DWM/browser surfaces from eating into discrete VRAM without needing to plug your monitor into motherboard graphics.
