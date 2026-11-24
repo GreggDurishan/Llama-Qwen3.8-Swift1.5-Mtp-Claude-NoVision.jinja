@@ -1,17 +1,15 @@
 Copyright [2026] [gregg durishan]
-Or is it? AI helped make it, and congress and courts have consistently held that only humans can hold copyright.
-But noone's acting like that's the case these days, so I dunno. 
-This is already a multi-national endeavor anyway, though I've not spoken with any co-contributor.
 
-Copied and adapted from froggeric/Qwen-Fixed-Chat-Templates (https://huggingface.co/froggeric/Qwen-Fixed-Chat-Templates/discussions/110/files)
+Copied and adapted from froggeric/Qwen-Fixed-Chat-Templates
+ (https://huggingface.co/froggeric/Qwen-Fixed-Chat-Templates/discussions/110/files)
 
 Known contributors:
-Original models 	Alibaba Cloud (Qwen team)
-Template fixes 	Frédéric Guigand (@froggeric)
-Property fuzzer, error tiering & test suite 	Juan Calderon-Perez (@g-a-b-y)
-Multi-tool alignment, reasoning fields & docs 	Gabriel Devenyi (@gdevenyi)
-C++ AST optimizations 	barubary / spiritbuun
-Anthropic/Claude blocks    Mark Ruth
+ Original models 	Alibaba Cloud (Qwen team)
+ Template fixes 	Frédéric Guigand (@froggeric)
+ Property fuzzer, error tiering & test suite 	Juan Calderon-Perez (@g-a-b-y)
+ Multi-tool alignment, reasoning fields & docs 	Gabriel Devenyi (@gdevenyi)
+ C++ AST optimizations 	barubary / spiritbuun
+ Anthropic/Claude blocks    Mark Ruth
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
