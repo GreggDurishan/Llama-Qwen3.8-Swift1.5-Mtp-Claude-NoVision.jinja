@@ -4,7 +4,7 @@ But noone's acting like that's the case these days, so I dunno.
 
 Copied and adapted from froggeric/Qwen-Fixed-Chat-Templates (https://huggingface.co/froggeric/Qwen-Fixed-Chat-Templates/discussions/110/files)
 
-known contributors:
+Known contributors:
 Original models 	Alibaba Cloud (Qwen team)
 Template fixes 	Frédéric Guigand (@froggeric)
 Property fuzzer, error tiering & test suite 	Juan Calderon-Perez (@g-a-b-y)
