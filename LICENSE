@@ -1,6 +1,13 @@
 Copyright [2026] [gregg durishan]
 
 Copied and adapted from froggeric/Qwen-Fixed-Chat-Templates (https://huggingface.co/froggeric/Qwen-Fixed-Chat-Templates/discussions/110/files)
+known contributors:
+Original models 	Alibaba Cloud (Qwen team)
+Template fixes 	Frédéric Guigand (@froggeric)
+Property fuzzer, error tiering & test suite 	Juan Calderon-Perez (@g-a-b-y)
+Multi-tool alignment, reasoning fields & docs 	Gabriel Devenyi (@gdevenyi)
+C++ AST optimizations 	barubary / spiritbuun
+Anthropic/Claude blocks    Mark Ruth
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
