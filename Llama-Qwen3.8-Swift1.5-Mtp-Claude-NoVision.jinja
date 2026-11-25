@@ -1,9 +1,8 @@
 {%- set template_version = "Llama-Qwen3.8-Swift1.5-Mtp-Claude-NoVision-v1.2" %}
-{%- set add_vision_id = add_vision_id if add_vision_id is defined else false %}
 {%- set enable_thinking = enable_thinking if enable_thinking is defined else true %}
-{%- set _preserve_thinking = force_preserve_thinking if (force_preserve_thinking is defined and force_preserve_thinking is not none) else false %}
+{%- set _preserve_thinking = preserve_thinking if (preserve_thinking is defined and preserve_thinking is not none) else (preserve_reasoning if (preserve_reasoning is defined and preserve_reasoning is not none) else false) %}
 {%- set _has_tools = (tools is defined and tools and tools is iterable and tools is not mapping) %}
-{%- set image_count = namespace(value=0) %}
+
 
 {%- set _effort_raw = (reasoning_effort | string | lower) if (reasoning_effort is defined and reasoning_effort is not none) else 'medium' %}
 {%- set _init_think = false if _effort_raw in ('none', 'off') else enable_thinking %}
@@ -40,7 +39,8 @@
     {{- _t | trim }}
 {%- endmacro %}
 
-{%- macro render_content(content, count_vision) %}
+
+{%- macro render_content(content) %}
     {%- if content is string %}{{- content }}
     {%- elif content is iterable and content is not mapping %}
         {%- for item in content %}
@@ -56,7 +56,7 @@
                 {%- elif t in ('tool_use', 'server_tool_use', 'mcp_tool_use') %}
                     {{- '[Tool call: ' ~ (item.name | default(item.tool_name | default('unknown'))) ~ (' ' ~ (item.input | tojson) if item.input is defined else '') ~ ']' }}
                 {%- elif t in ('tool_result', 'web_search_tool_result', 'code_execution_tool_result') %}
-                    {%- set _tr_body = (render_content(item.content, count_vision) if item.content is defined else (item.text if item.text is defined else '')) | trim %}
+                    {%- set _tr_body = (render_content(item.content) if item.content is defined else (item.text if item.text is defined else '')) | trim %}
                     {{- ('\n' if not loop.first else '') ~ '<tool_response>\n' ~ _tr_body ~ '\n</tool_response>' }}
                 {%- elif t == 'redacted_thinking' %}{{- '[Redacted thinking]' }}
                 {%- elif t == 'document' %}
@@ -82,7 +82,7 @@
 
 {%- set sys_state = namespace(content='') %}
 {%- for message in messages[:head.count] %}
-    {%- set _part = parse_and_strip(render_content(message.content, false), true, true) %}
+    {%- set _part = parse_and_strip(render_content(message.content), true, true) %}
     {%- if _part %}{%- set sys_state.content = (sys_state.content ~ '\n\n' ~ _part) if sys_state.content else _part %}{%- endif %}
 {%- endfor %}
 
@@ -115,7 +115,7 @@
 {%- for message in _msgs[::-1] %}
     {%- set index = ((_msgs | length) - 1) - loop.index0 %}
     {%- if ns.multi_step_tool and message.role == 'user' %}
-        {%- set _rc = render_content(message.content, false) | trim %}
+        {%- set _rc = render_content(message.content) | trim %}
         {%- set _starts_internal = (_rc.startswith('<tool_response>') or _rc.startswith('<system-reminder>')) %}
         {%- set _ends_internal = (_rc.endswith('</tool_response>') or _rc.endswith('</system-reminder>')) %}
         {%- if not (_starts_internal and _ends_internal) %}
@@ -129,7 +129,7 @@
 {%- set ns2 = namespace(prev_role='') %}
 {%- for message in _msgs %}
     {%- set is_system = (message.role in ('system', 'developer')) %}
-    {%- set content = parse_and_strip(render_content(message.content, true), false, is_system) if (is_system or message.role == 'user') else (render_content(message.content, true) | trim) %}
+    {%- set content = parse_and_strip(render_content(message.content), false, is_system) if (is_system or message.role == 'user') else (render_content(message.content) | trim) %}
     {%- if is_system %}
         {%- if content %}{{- '<|im_start|>system\n' + content + '<|im_end|>\n' }}{%- endif %}
     {%- elif message.role == 'user' %}
