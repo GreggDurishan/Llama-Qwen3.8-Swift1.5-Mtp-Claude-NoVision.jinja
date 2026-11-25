@@ -13,13 +13,16 @@ Adapted from [froggeric/Qwen-Fixed-Chat-Templates](https://huggingface.co/frogge
 **Performance:** ~136k context · 300–800 t/s prompt processing · 15–40 t/s generation (with MTP speculative decoding)
 
 ```bash
-llama-server -m Swift-1.5-Qwen3.8-27B-GSQ-RCO-IQ3_XXS-mtp.gguf \
-  --threads 6 --parallel 1 --load-mode none --fit-target 512 \
-  --flash-attn on --reasoning-format deepseek --reasoning-effort medium \
-  --temp 0.7 --top-k 20 --top-p 0.95 --min-p 0.0 \
-  --cache-type-k q5_0 --cache-type-v q4_1 --batch-size 1024 --ubatch-size 512 \
-  --spec-type draft-mtp --spec-draft-n-max 9 --spec-draft-p-min 0.72 \
-  --jinja --chat-template-file Llama-Qwen3.8-Swift1.5-Mtp-Claude-NoVision.jinja
+llama-server `
+  -m Swift-1.5-Qwen3.8-27B-GSQ-RCO-IQ3_XXS-mtp.gguf `
+  --threads 6 --parallel 1 --load-mode none --fit-target 512 --flash-attn on `
+  --batch-size 1024 --ubatch-size 512 --cache-type-k q5_0 --cache-type-v q4_1 `
+  --cache-ram 14336 --checkpoint-min-step 4096 `
+  --reasoning-format deepseek --reasoning-effort medium --no-reasoning-preserve `
+  --temp 0.7 --top-k 20 --top-p 0.95 --min-p 0.0 `
+  --spec-type draft-mtp --spec-draft-n-max 9 --spec-draft-p-min 0.72 `
+  --jinja --chat-template-file Llama-Qwen3.8-Swift1.5-Mtp-Claude-NoVision.jinja `
+  --metrics
 ```
 
 > **VRAM Tip:** Disabling hardware/graphics acceleration in your browser (and terminal) keeps desktop DWM/browser surfaces from eating into discrete VRAM without needing to plug your monitor into motherboard graphics.
@@ -46,4 +49,11 @@ llama-server -m Swift-1.5-Qwen3.8-27B-GSQ-RCO-IQ3_XXS-mtp.gguf \
 
 * **Native `<tool_response>` Wrapping for Anthropic Tool Results:** Renders `tool_result`, `web_search_tool_result`, and `code_execution_tool_result` blocks inside Qwen's native `<tool_response>...</tool_response>` tags (with newline separation between parallel tool results) so multi-step Claude Code tool loops preserve active `<think>` reasoning until the next user turn.
 * **Safe `NoVision` Image Placeholder:** Replaces `<|vision_start|><|image_pad|><|vision_end|>` special tokens with `[Image omitted - NoVision template]` so accidental image blocks in chat history don't trip up `llama-server` when running without `--mmproj`.
+
+### What's Changed in v1.2
+* **Prefix Cache Protection (`x-anthropic-*` Scrubbing):** Automatically strips dynamic Anthropic billing and routing headers (such as `x-anthropic-billing-header:`) from system messages before tokenization, preventing token-0 cache misses in `llama-server`.
+* **Active-Turn Thinking Retention by Default:** Replaced `preserve_thinking` / `preserve_reasoning` auto-detection with an opt-in `force_preserve_thinking` flag so `llama-server` defaults to retaining `<think>` traces only for the active tool loop rather than bloating context across all prior turns.
+* **Claude Code `<system-reminder>` Compatibility:** Updated active-turn boundary detection to recognize standalone and bundled `<tool_response>` / `<system-reminder>` blocks without prematurely pruning current-turn reasoning, and added newline separation when text blocks follow tool results.
+* **Single-Pass System Parsing & Empty-Turn Guards:** Consolidated leading system aggregation and `<|think_*|>` override detection into one pass (preventing mid-chat override tags from invalidating the system prefix), skipped blank turns left after stripping, and normalized historical assistant `<think>\n\n</think>` blocks.
+
 
