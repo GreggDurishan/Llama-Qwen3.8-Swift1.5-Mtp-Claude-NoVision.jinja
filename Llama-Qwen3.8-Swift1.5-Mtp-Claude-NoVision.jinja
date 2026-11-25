@@ -1,7 +1,7 @@
-{%- set template_version = "Llama-Qwen3.8-Swift1.5-Mtp-Claude-NoVision-v1.1" %}
+{%- set template_version = "Llama-Qwen3.8-Swift1.5-Mtp-Claude-NoVision-v1.2" %}
 {%- set add_vision_id = add_vision_id if add_vision_id is defined else false %}
 {%- set enable_thinking = enable_thinking if enable_thinking is defined else true %}
-{%- set _preserve_thinking = preserve_thinking if (preserve_thinking is defined and preserve_thinking is not none) else (preserve_reasoning if (preserve_reasoning is defined and preserve_reasoning is not none) else false) %}
+{%- set _preserve_thinking = force_preserve_thinking if (force_preserve_thinking is defined and force_preserve_thinking is not none) else false %}
 {%- set _has_tools = (tools is defined and tools and tools is iterable and tools is not mapping) %}
 {%- set image_count = namespace(value=0) %}
 
@@ -12,21 +12,30 @@
 
 {%- set _think_tokens = ['<|think_off|>', '<|think_on|>', '<|think_xhigh|>', '<|think_high|>', '<|think_ultracode|>', '<|think_extreme|>', '<|think_max|>', '<|think_medium|>', '<|think_low|>', '<|think_minimal|>'] %}
 
-{%- macro parse_and_strip(text, update_state=false) %}
+{%- macro parse_and_strip(text, update_state=false, strip_headers=false) %}
     {%- set _t = text if text is string else (text | string) %}
-    {%- if update_state and '<|think_' in _t %}
-        {%- if '<|think_off|>' in _t %}{%- set ns_state.thinking = false %}
-        {%- elif '<|think_on|>' in _t %}{%- set ns_state.thinking = true %}
-        {%- elif '<|think_xhigh|>' in _t or '<|think_high|>' in _t or '<|think_ultracode|>' in _t or '<|think_extreme|>' in _t or '<|think_max|>' in _t %}
-            {%- set ns_state.thinking = true %}{%- set ns_state.effort = 'xhigh' %}{%- set ns_state.overridden = true %}
-        {%- elif '<|think_low|>' in _t or '<|think_minimal|>' in _t %}
-            {%- set ns_state.thinking = true %}{%- set ns_state.effort = 'low' %}{%- set ns_state.overridden = true %}
-        {%- elif '<|think_medium|>' in _t %}
-            {%- set ns_state.thinking = true %}{%- set ns_state.effort = 'medium' %}{%- set ns_state.overridden = true %}
-        {%- endif %}
-    {%- endif %}
+  {%- if update_state and '<|think_' in _t %}
+      {%- if '<|think_off|>' in _t %}{%- set ns_state.thinking = false %}
+      {%- elif '<|think_on|>' in _t %}{%- set ns_state.thinking = true %}
+      {%- elif '<|think_xhigh|>' in _t or '<|think_high|>' in _t or '<|think_ultracode|>' in _t or '<|think_extreme|>' in _t or '<|think_max|>' in _t %}
+          {%- set ns_state.thinking = true %}{%- set ns_state.effort = 'xhigh' %}{%- set ns_state.overridden = true %}
+      {%- elif '<|think_low|>' in _t or '<|think_minimal|>' in _t %}
+          {%- set ns_state.thinking = true %}{%- set ns_state.effort = 'low' %}{%- set ns_state.overridden = true %}
+      {%- elif '<|think_medium|>' in _t %}
+          {%- set ns_state.thinking = true %}{%- set ns_state.effort = 'medium' %}{%- set ns_state.overridden = true %}
+      {%- endif %}
+  {%- endif %}
     {%- if '<|think_' in _t %}
         {%- for tok in _think_tokens %}{%- set _t = _t.replace(tok, '') %}{%- endfor %}
+    {%- endif %}
+    {%- if strip_headers and 'x-anthropic-' in (_t | lower) %}
+        {%- set _clean = namespace(lines=[]) %}
+        {%- for _line in _t.split('\n') %}
+            {%- if not _line.strip().lower().startswith('x-anthropic-') %}
+                {%- set _clean.lines = _clean.lines + [_line] %}
+            {%- endif %}
+        {%- endfor %}
+        {%- set _t = _clean.lines | join('\n') %}
     {%- endif %}
     {{- _t | trim }}
 {%- endmacro %}
@@ -37,7 +46,7 @@
         {%- for item in content %}
             {%- if item is mapping %}
                 {%- set t = item.type | default('unknown') %}
-                {%- if t == 'text' and item.text is defined %}{{- item.text }}
+                {%- if t == 'text' and item.text is string %}{{- ('\n' if not loop.first else '') ~ item.text }}
                 {%- elif t == 'image' or 'image' in item or 'image_url' in item %}
                     {{- '[Image omitted - NoVision template]' }}
                 {%- elif t == 'thinking' and (item.thinking is defined or item.text is defined) %}
@@ -64,11 +73,17 @@
 
 {%- if not messages %}{{- raise_exception('No messages provided.') }}{%- endif %}
 
-{# ---- First pass: detect inline <|think_*|> overrides across system/user turns ---- #}
-{%- for msg in messages %}
-    {%- if msg.role in ('system', 'developer', 'user') %}
-        {%- set _ = parse_and_strip(render_content(msg.content, false), true) %}
-    {%- endif %}
+{# ---- Aggregate leading system/developer messages & detect <|think_*|> overrides ---- #}
+{%- set head = namespace(count=0, seen=false) %}
+{%- for message in messages %}
+    {%- if message.role in ('system', 'developer') and not head.seen %}{%- set head.count = head.count + 1 %}
+    {%- else %}{%- set head.seen = true %}{%- endif %}
+{%- endfor %}
+
+{%- set sys_state = namespace(content='') %}
+{%- for message in messages[:head.count] %}
+    {%- set _part = parse_and_strip(render_content(message.content, false), true, true) %}
+    {%- if _part %}{%- set sys_state.content = (sys_state.content ~ '\n\n' ~ _part) if sys_state.content else _part %}{%- endif %}
 {%- endfor %}
 
 {%- set reasoning_instructions = '' %}
@@ -82,17 +97,6 @@
     {%- endif %}
 {%- endif %}
 
-{# ---- Aggregate leading system/developer messages ---- #}
-{%- set head = namespace(count=0, seen=false) %}
-{%- for message in messages %}
-    {%- if message.role in ('system', 'developer') and not head.seen %}{%- set head.count = head.count + 1 %}
-    {%- else %}{%- set head.seen = true %}{%- endif %}
-{%- endfor %}
-{%- set sys_state = namespace(content='') %}
-{%- for message in messages[:head.count] %}
-    {%- set _part = parse_and_strip(render_content(message.content, false)) %}
-    {%- if _part %}{%- set sys_state.content = (sys_state.content ~ '\n\n' ~ _part) if sys_state.content else _part %}{%- endif %}
-{%- endfor %}
 {%- set _sc = sys_state.content %}
 {%- set _msgs = messages[head.count:] %}
 
@@ -112,7 +116,9 @@
     {%- set index = ((_msgs | length) - 1) - loop.index0 %}
     {%- if ns.multi_step_tool and message.role == 'user' %}
         {%- set _rc = render_content(message.content, false) | trim %}
-        {%- if not (_rc.startswith('<tool_response>') and _rc.endswith('</tool_response>')) %}
+        {%- set _starts_internal = (_rc.startswith('<tool_response>') or _rc.startswith('<system-reminder>')) %}
+        {%- set _ends_internal = (_rc.endswith('</tool_response>') or _rc.endswith('</system-reminder>')) %}
+        {%- if not (_starts_internal and _ends_internal) %}
             {%- set ns.multi_step_tool = false %}{%- set ns.last_query_index = index %}
         {%- endif %}
     {%- endif %}
@@ -123,12 +129,11 @@
 {%- set ns2 = namespace(prev_role='') %}
 {%- for message in _msgs %}
     {%- set is_system = (message.role in ('system', 'developer')) %}
-    {%- set content = parse_and_strip(render_content(message.content, true)) if (is_system or message.role == 'user') else (render_content(message.content, true) | trim) %}
-
+    {%- set content = parse_and_strip(render_content(message.content, true), false, is_system) if (is_system or message.role == 'user') else (render_content(message.content, true) | trim) %}
     {%- if is_system %}
-        {{- '<|im_start|>system\n' + content + '<|im_end|>\n' }}
+        {%- if content %}{{- '<|im_start|>system\n' + content + '<|im_end|>\n' }}{%- endif %}
     {%- elif message.role == 'user' %}
-{{- '<|im_start|>user\n' + content + '<|im_end|>\n' }}
+        {%- if content %}{{- '<|im_start|>user\n' + content + '<|im_end|>\n' }}{%- endif %}
     {%- elif message.role == 'assistant' %}
         {%- set reasoning_content = '' %}
         {%- set _explicit = message.reasoning_content if (message.reasoning_content is defined and message.reasoning_content is not none) else (message.thinking if (message.thinking is defined and message.thinking is not none) else (message.reasoning if (message.reasoning is defined and message.reasoning is not none) else '')) %}
@@ -143,7 +148,7 @@
         {%- endif %}
         {%- set reasoning_content = reasoning_content | trim %}
 
-        {{- '<|im_start|>assistant\n' ~ ('<think>\n' + reasoning_content + '\n</think>\n\n' if (reasoning_content and (_preserve_thinking or loop.index0 > ns.last_query_index)) else '') ~ content }}
+      {{- '<|im_start|>assistant\n' ~ (('<think>\n' + reasoning_content + '\n</think>\n\n') if (reasoning_content and (_preserve_thinking or loop.index0 > ns.last_query_index)) else '<think>\n\n</think>\n\n') ~ content }}
 
         {%- if message.tool_calls is defined and message.tool_calls and message.tool_calls is iterable and message.tool_calls is not mapping %}
             {%- for tool_call in message.tool_calls %}
