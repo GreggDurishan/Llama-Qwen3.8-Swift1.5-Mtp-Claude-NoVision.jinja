@@ -6,10 +6,11 @@ Adapted from [froggeric/Qwen-Fixed-Chat-Templates](https://huggingface.co) (inco
 
 ---
 
-## 🚨 Important: Use `--no-reasoning-preserve`
+## 🚨 Important: Use `--reasoning-format deepseek` and `--no-reasoning-preserve`
 
 This template follows `llama-server`'s native reasoning-preservation behavior, which defaults to **`--reasoning-preserve` (`on`)**. For agentic coding workflows like Claude Code, we strongly recommend passing **`--no-reasoning-preserve`**:
 
+* `--reasoning-format deepseek` extracts <think> blocks into the dedicated reasoning_content API response field. This prevents raw thinking tokens from leaking into the text stream and stopping tool calls midway.
 * **Reasoning Preservation (`--no-reasoning-preserve` vs. Default):** Passing `--no-reasoning-preserve` frees **15–30% more usable context** and matches Qwen 3.8's native training format by pruning older `<think>` traces on each new user prompt (trading a ~1–3s checkpoint re-prefill per human turn), whereas leaving `llama-server`'s default `--reasoning-preserve` enabled preserves **99.9% instant prefix-cache hits** across every turn at the cost of earlier context compaction.
 
 ---
@@ -25,7 +26,8 @@ llama-server
   --threads 6 --parallel 1 --load-mode none --fit-target 512 --flash-attn on
   --batch-size 1024 --ubatch-size 512 --cache-type-k q5_0 --cache-type-v q4_1
   --cache-ram 14336 --checkpoint-min-step 4096
-  --reasoning-format deepseek --reasoning-effort medium --no-reasoning-preserve
+  --reasoning-format deepseek --reasoning-effort medium --no-reasoning-preserve --reasoning-budget 8192
+  --reasoning-budget-message "Thinking budget reached. Proceed with the best action or response now."
   --temp 0.7 --top-k 20 --top-p 0.95 --min-p 0.0
   --spec-type draft-mtp --spec-draft-n-max 9 --spec-draft-p-min 0.72
   --jinja --chat-template-file Llama-Qwen3.8-Swift1.5-Mtp-Claude-NoVision.jinja
