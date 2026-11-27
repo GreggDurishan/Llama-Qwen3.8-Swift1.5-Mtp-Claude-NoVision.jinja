@@ -1,6 +1,6 @@
 # Llama-Qwen3.8-Swift1.5-Mtp-Claude-NoVision.jinja
 
-A streamlined Jinja chat template for running **Claude Code** against **Swift 1.5** or **Qwen 3.8 MTP** GGUFs in `llama-server` (without vision projectors).
+A streamlined Jinja chat template for running **Claude Code** against **Swift 1.5** or **Qwen 3.8 MTP** GGUFs in `llama-server` without vision projectors.
 
 Adapted from [froggeric/Qwen-Fixed-Chat-Templates](https://huggingface.co) (incorporating Anthropic content-block handling from [PR #110](https://huggingface.co/discussions/110/files)).
 
@@ -17,21 +17,20 @@ This template follows `llama-server`'s native reasoning-preservation behavior, w
 
 ## Example Tuned `llama-server` Setup
 
-**Environment:** Ryzen 5 9600X · 32 GB DDR5 · RX 9060 XT 16 GB · Llama.cpp 1.0 (Windows x64 Vulkan)  
-**Performance:** ~136k context · 300–800 t/s prompt processing · 15–40 t/s generation (with MTP speculative decoding)
+**Environment:** Ryzen 5 9600X · 32 GB DDR5-6000 · RX 9060 XT 16 GB · Llama.cpp 1.0 (Windows x64 Vulkan)  
+**Configuration:** Fully in VRAM · 114k context · Cache-ram for 2 Full / 3 Mid-Context Agents w/ no Thrashing  
+**1h Parent/Child Agent Diagnose/Coding Task:** 430 t/s PreFill · 31 t/s Gen · 82.5% Draft Acceptance · 6.34 Mean Len
 
 ```text
-llama-server
-  -m Swift-1.5-Qwen3.8-27B-GSQ-RCO-IQ3_XXS-mtp.gguf
-  --threads 6 --parallel 1 --load-mode none --fit-target 512 --flash-attn on
-  --batch-size 1024 --ubatch-size 512 --cache-type-k q5_0 --cache-type-v q4_1
-  --cache-ram 14336 --checkpoint-min-step 4096
-  --reasoning-format deepseek --reasoning-effort medium --no-reasoning-preserve --reasoning-budget 8192
-  --reasoning-budget-message "Thinking budget reached. Proceed with the best action or response now."
-  --temp 0.7 --top-k 20 --top-p 0.95 --min-p 0.0
-  --spec-type draft-mtp --spec-draft-n-max 9 --spec-draft-p-min 0.72
-  --jinja --chat-template-file Llama-Qwen3.8-Swift1.5-Mtp-Claude-NoVision.jinja
-  --metrics
+llama-server 
+  -m Swift-1.5-Qwen3.8-27B-GSQ-RCO-IQ3_XXS-mtp.gguf -ngl all -c 114688 
+  --fit off --threads 6 --parallel 1 --load-mode none --flash-attn on 
+  --temp 0.7 --top-k 20 --top-p 0.95 --min-p 0.0 --batch-size 1024 --ubatch-size 512 
+  --cache-type-k q4_0 --cache-type-v q4_1 --cache-ram 15360 --checkpoint-min-step 16384 
+  --spec-type draft-mtp --spec-draft-n-max 9 --spec-draft-p-min 0.72 
+  --reasoning-format deepseek --reasoning-effort medium --no-reasoning-preserve --reasoning-budget 8192 
+  --reasoning-budget-message "Thinking budget reached. Proceed with the best action or response now." 
+  --jinja --chat-template-file Llama-Qwen3.8-Swift1.5-Mtp-Claude-NoVision.jinja --metrics
 ```
 
 * **VRAM Tip:** Disabling hardware/graphics acceleration in your browser (and terminal) keeps desktop DWM/browser surfaces from eating into discrete VRAM without needing to plug your monitor into motherboard graphics.
