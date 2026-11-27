@@ -19,16 +19,17 @@ This template follows `llama-server`'s native reasoning-preservation behavior, w
 
 **Environment:** Ryzen 5 9600X · 32 GB DDR5-6000 · RX 9060 XT 16 GB · Llama.cpp 1.0 (Windows x64 Vulkan)  
 **Configuration:** Fully in VRAM · 114k context · Cache-ram for 2 Full / 3 Mid-Context Agents w/ no Thrashing  
-**1h Parent/Child Agent Diagnose/Coding Task:** 430 t/s PreFill · 31 t/s Gen · 82.5% Draft Acceptance · 6.34 Mean Len
+**1h Parent/Child Agent Diagnose/Coding Task:** 430 t/s PreFill · 31 t/s Gen · 82.5% Draft Acceptance · 6.34 Mean Len 
+**Benchmark:** https://llm-bench.io/benchmarks/cmwzgz7sb02zl01lmc2t9k2jj
 
 ```text
 llama-server 
   -m Swift-1.5-Qwen3.8-27B-GSQ-RCO-IQ3_XXS-mtp.gguf -ngl all -c 114688 
   --fit off --threads 6 --parallel 1 --load-mode none --flash-attn on 
-  --temp 0.7 --top-k 20 --top-p 0.95 --min-p 0.0 --batch-size 1024 --ubatch-size 512 
+  --temp 1 --top-k 20 --top-p 0.95 --min-p 0.0 --batch-size 1024 --ubatch-size 512 
   --cache-type-k q4_0 --cache-type-v q4_1 --cache-ram 15360 --checkpoint-min-step 16384 
   --spec-type draft-mtp --spec-draft-n-max 9 --spec-draft-p-min 0.72 
-  --reasoning-format deepseek --reasoning-effort medium --no-reasoning-preserve --reasoning-budget 8192 
+  --reasoning-format deepseek --reasoning-effort xhigh --no-reasoning-preserve --reasoning-budget 16384 
   --reasoning-budget-message "Thinking budget reached. Proceed with the best action or response now." 
   --jinja --chat-template-file Llama-Qwen3.8-Swift1.5-Mtp-Claude-NoVision.jinja --metrics
 ```
