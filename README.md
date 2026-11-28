@@ -1,6 +1,6 @@
 # Llama-Qwen3.8-Swift1.5-Mtp-Claude-NoVision.jinja
 
-A streamlined Jinja chat template for running **Claude Code** against **Swift 1.5** or **Qwen 3.8 MTP** GGUFs in `llama-server` without vision projectors, adapted from [froggeric/Qwen-Fixed-Chat-Templates](https://huggingface.co/froggeric/Qwen-Fixed-Chat-Templates/discussions/110/files).
+A streamlined Jinja2 chat template for running Claude Code on [Qwen 3.8](https://github.com/QwenLM/Qwen3.8) Family (ie: Swift 1.5) GGUFs in llama-server without vision projectors, adapted from [froggeric/Qwen-Fixed-Chat-Templates](https://huggingface.co/froggeric/Qwen-Fixed-Chat-Templates/discussions/110/files).
 
 * Bridges Claude’s Anthropic API format and Qwen3.8’s native ChatML + XML tool-calling syntax so local `llama-server` setups stay fast, accurate, and within tight VRAM limits.
 * Protects KV-cache prefix by stripping dynamic `x-anthropic-*` headers and merging leading `system`/`developer` blocks into a single static header.
@@ -12,10 +12,10 @@ A streamlined Jinja chat template for running **Claude Code** against **Swift 1.
 
 # Example Tuned Setup & Config Tips
 
-**Environment:** Ryzen 5 9600X · 32 GB DDR5-6000 · RX 9060 XT 16 GB · Llama.cpp 1.1 (Windows x64 Vulkan)  
+**Environment:** Ryzen 5 9600X · 32 GB DDR5-6000 · RX 9060 XT 16 GB · Llama.cpp v1.1.0 (Windows x64 Vulkan)  
 **1h Parent/Child Agent Diagnose/Coding Task:** 430 t/s PreFill · 31 t/s Gen · 82.5% Draft Acceptance · 6.34 Mean Len  
-**llm-bench.io:** [Results](https://llm-bench.io/benchmarks/cmwzgz7sb02zl01lmc2t9k2jj)
- T/S 32.0 · QUALITY 88.7 · Agent 91.1 · Code 81.7 · RP 94.4 · Research 87.6  
+**llm-bench.io:** [Results](https://llm-bench.io/benchmarks/cmx05enua034w01lmhxc88kdi)
+ T/S 31.4 · QUALITY 89.3 · Agent 91.3 · Code 84.8 · RP 93.8 · Research 87.1  
 
 ## `llama-server` Invocation
 
@@ -151,4 +151,4 @@ Local LLM via llama-server (http://localhost:9931/, API only). 112K context (com
 
 </details>
 
-<sub>State your true auto-compact ceiling in <code># Environment</code> and <code># Sub-agents</code> - adjust this number to match your own <code>-c * CLAUDE_AUTOCOMPACT_PCT_OVERRIDE</code> so the model splits work cleanly instead of triggering mid-task compactions. <code># File Reading Rules</code> sits at the top for peak transformer attention, forcing targeted <code>Glob</code>/<code>Grep</code> lookups, 100–150 line read slices, truncated diffs, and zero post-edit re-reads to preserve KV cache and 27B reasoning focus. <code># Web</code> routes browsing through <code>playwright-cli</code> with targeted extraction so raw web pages never bloat the context window, while <code># Git</code> provides essential branch and commit guardrails in ~95 tokens to replace the ~1,200-token prompt stripped in <code>settings.json</code>. <code># Sub-agents</code> keeps the main Architect grounded while using <code>Explore</code> subagents selectively, scopes child tasks with disk checkpoints and short summaries so parent context stays lean, keeps the parent completely silent while a child owns Slot 0, and recovers stalled agents via <code>SendMessage</code> instead of spawning cache-wiping replacements.</sub>
+<sub>State your true auto-compact ceiling in <code># Environment</code> and <code># Sub-agents</code> - adjust this number to match your own <code>-c * CLAUDE_AUTOCOMPACT_PCT_OVERRIDE</code> so the model splits work cleanly instead of triggering mid-task compactions. <code># File Reading Rules</code> sits at the top for peak transformer attention, forcing targeted <code>Glob</code>/<code>Grep</code> lookups, 100–150 line read slices, truncated diffs, and zero post-edit re-reads to preserve KV cache and 27B reasoning focus. <code># Web</code> routes browsing through [playwright-cli](https://github.com/microsoft/playwright-cli) with targeted extraction so raw web pages never bloat the context window, while <code># Git</code> provides essential branch and commit guardrails in ~95 tokens to replace the ~1,200-token prompt stripped in <code>settings.json</code>. <code># Sub-agents</code> keeps the main Architect grounded while using <code>Explore</code> subagents selectively, scopes child tasks with disk checkpoints and short summaries so parent context stays lean, keeps the parent completely silent while a child owns Slot 0, and recovers stalled agents via <code>SendMessage</code> instead of spawning cache-wiping replacements.</sub>
