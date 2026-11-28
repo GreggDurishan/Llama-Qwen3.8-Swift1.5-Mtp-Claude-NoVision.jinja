@@ -1,4 +1,4 @@
-{%- set template_version = "Llama-Qwen3.8-Swift1.5-Mtp-Claude-NoVision-v1.2" %}
+{%- set template_version = "Llama-Qwen3.8-Swift1.5-Mtp-Claude-NoVision-v1.3" %}
 {%- set enable_thinking = enable_thinking if enable_thinking is defined else true %}
 {%- set _preserve_thinking = preserve_thinking if (preserve_thinking is defined and preserve_thinking is not none) else (preserve_reasoning if (preserve_reasoning is defined and preserve_reasoning is not none) else false) %}
 {%- set _has_tools = (tools is defined and tools and tools is iterable and tools is not mapping) %}
@@ -104,7 +104,7 @@
 {%- if _has_tools %}
     {{- '<|im_start|>system\n' ~ (reasoning_instructions + '\n\n' if reasoning_instructions else '') ~ '# Tools\n\nYou have access to the following functions:\n\n<tools>' }}
     {%- for tool in tools %}{{- '\n' ~ (tool | tojson) }}{%- endfor %}
-    {{- '\n</tools>\n\nIf you choose to call a function ONLY reply in the following format with NO suffix:\n\n' ~ ('<think>\nBrief explanation of tool call\n</think>\n' if ns_state.thinking else '') ~ '<tool_call>\n<function=example_function_name>\n<parameter=example_parameter_1>\nvalue_1\n</parameter>\n<parameter=example_parameter_2>\nThis is the value for the second parameter\nthat can span\nmultiple lines\n</parameter>\n</function>\n</tool_call>\n\n<IMPORTANT>\nReminder:\n' ~ ('- You can use the <think></think> block to plan your next tool call OR to synthesize data and formulate your final response to the user.\n- ALL explanation and reasoning MUST be placed strictly inside the <think></think> block.\n' if ns_state.thinking else '') ~ '- Function calls MUST follow the specified format: an inner <function=...></function> block must be nested within <tool_call></tool_call> XML tags.\n- If you choose to call a tool, you MUST output the <tool_call> block IMMEDIATELY' ~ (' after thinking' if ns_state.thinking else '') ~ ', with NO conversational text before it.\n- The <tool_call> and <function> tags MUST be at the very beginning of a new line, with NO spaces or indentation before them.\n- To call multiple functions, output a separate, completely closed <tool_call></tool_call> block for EACH function. Do NOT nest <tool_call> blocks.\n- If you have all necessary data, provide your final answer directly to the user without any tool call.\n</IMPORTANT>' ~ ('\n\n' + _sc if _sc else '') ~ '<|im_end|>\n' }}
+    {{- '\n</tools>\n\nFor each function call, return an XML block within <tool_call></tool_call> tags with NO text before or after:\n' ~ ('<think>\nBrief reasoning\n</think>\n' if ns_state.thinking else '') ~ '<tool_call>\n<function=function_name>\n<parameter=param_name>\nvalue\n</parameter>\n</function>\n</tool_call>\n\nRules:\n' ~ ('- Keep all reasoning inside <think></think>.\n' if ns_state.thinking else '') ~ '- Output one separate <tool_call></tool_call> block per function call at the start of a new line.\n- If no tool is needed, reply directly to the user.' ~ ('\n\n' + _sc if _sc else '') ~ '<|im_end|>\n' }}
 {%- elif _sc or reasoning_instructions %}
     {{- '<|im_start|>system\n' ~ (reasoning_instructions + '\n\n' if reasoning_instructions else '') ~ _sc ~ '<|im_end|>\n' }}
 {%- endif %}
@@ -129,9 +129,15 @@
 {%- set ns2 = namespace(prev_role='') %}
 {%- for message in _msgs %}
     {%- set is_system = (message.role in ('system', 'developer')) %}
+    {%- set norm_role = 'system' if is_system else message.role %}
     {%- set content = parse_and_strip(render_content(message.content), false, is_system) if (is_system or message.role == 'user') else (render_content(message.content) | trim) %}
     {%- if is_system %}
-        {%- if content %}{{- '<|im_start|>system\n' + content + '<|im_end|>\n' }}{%- endif %}
+        {%- if content %}
+            {%- if ns2.prev_role != 'system' %}{{- '<|im_start|>system\n' }}{%- else %}{{- '\n\n' }}{%- endif %}
+            {{- content }}
+            {%- set _next_is_sys = (not loop.last) and (_msgs[loop.index0 + 1].role in ('system', 'developer')) %}
+            {%- if not _next_is_sys %}{{- '<|im_end|>\n' }}{%- endif %}
+        {%- endif %}
     {%- elif message.role == 'user' %}
         {%- if content %}{{- '<|im_start|>user\n' + content + '<|im_end|>\n' }}{%- endif %}
     {%- elif message.role == 'assistant' %}
@@ -147,9 +153,8 @@
             {%- set content = content.split('</think>', 1)[-1].lstrip('\n') %}
         {%- endif %}
         {%- set reasoning_content = reasoning_content | trim %}
-
-      {{- '<|im_start|>assistant\n' ~ (('<think>\n' + reasoning_content + '\n</think>\n\n') if (reasoning_content and (_preserve_thinking or loop.index0 > ns.last_query_index)) else '<think>\n\n</think>\n\n') ~ content }}
-
+        {%- set _empty_think = '<think>\n\n</think>\n\n' if ns_state.thinking else '' %}
+        {{- '<|im_start|>assistant\n' ~ (('<think>\n' + reasoning_content + '\n</think>\n\n') if (reasoning_content and (_preserve_thinking or loop.index0 > ns.last_query_index)) else _empty_think) ~ content }}
         {%- if message.tool_calls is defined and message.tool_calls and message.tool_calls is iterable and message.tool_calls is not mapping %}
             {%- for tool_call in message.tool_calls %}
                 {%- set tc = tool_call.function if (tool_call.function is defined and tool_call.function is not none) else tool_call %}
@@ -176,7 +181,7 @@
     {%- else %}
         {{- '<|im_start|>user\n[' + message.role + ']: ' + content + '<|im_end|>\n' }}
     {%- endif %}
-    {%- set ns2.prev_role = message.role %}
+    {%- if not is_system or content %}{%- set ns2.prev_role = norm_role %}{%- endif %}
 {%- endfor %}
 
 {%- if add_generation_prompt %}
