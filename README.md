@@ -24,7 +24,7 @@ llama-server ^
   -m Swift-1.5-Qwen3.8-27B-GSQ-RCO-IQ3_XXS-mtp.gguf -ngl all -c 114688 ^
   --fit off --threads 6 --parallel 1 --load-mode none --flash-attn on ^
   --temp 1 --top-k 20 --top-p 0.95 --min-p 0.0 --batch-size 1024 --ubatch-size 512 ^
-  --cache-type-k q4_0 --cache-type-v q4_1 --cache-ram 15360 --checkpoint-min-step 16384 ^
+  --cache-type-k q4_0 --cache-type-v q4_1 --cache-ram 18432 --checkpoint-min-step 16384 ^
   --spec-type draft-mtp --spec-draft-n-max 9 --spec-draft-p-min 0.72 --timeout 900 ^
   --reasoning-format deepseek --reasoning-effort xhigh --no-reasoning-preserve --reasoning-budget 12288 ^
   --reasoning-budget-message "Thinking budget reached. Proceed with the best action or response now." ^
